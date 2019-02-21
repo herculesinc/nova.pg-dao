@@ -23,6 +23,16 @@
             "problemMatcher": [ "$tsc" ]
         },
         {
+            "label": "test",
+            "type": "gulp",
+            "task": "test",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "problemMatcher": [ "$tsc" ]
+        },
+        {
             "label": "publish",
             "type": "gulp",
             "task": "publish",

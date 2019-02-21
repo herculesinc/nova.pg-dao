@@ -236,8 +236,14 @@ function validateQueryArguments(text, nameOrOptions, options) {
         }
     }
     else if (typeof nameOrOptions === 'object') {
+        if (Array.isArray(nameOrOptions)) {
+            throw new TypeError('Query name must be a string');
+        }
         qName = 'unnamed query';
         qOptions = validateQueryOptions(nameOrOptions);
+    }
+    else if (nameOrOptions) {
+        throw new TypeError('Query name must be a string');
     }
     else {
         qName = 'unnamed query';
@@ -245,30 +251,29 @@ function validateQueryArguments(text, nameOrOptions, options) {
     return { text: qText, name: qName, options: qOptions };
 }
 function validateQueryOptions({ mask, mode, handler }) {
-    if (mask !== 'list' && mask !== 'single')
-        throw new TypeError(`Query mask '${mask}' is invalid`);
-    if (mode) {
-        if (mode !== 'object' && mode !== 'array')
-            throw new TypeError(`Query mode '${mask}' is invalid`);
+    if (mask !== 'list' && mask !== 'single') {
+        const ms = (typeof mask === 'object') ? JSON.stringify(mask) : mask;
+        throw new TypeError(`Query mask '${ms}' is invalid`);
+    }
+    if (mode === undefined) {
+        mode = 'object';
     }
     else {
-        mode = 'object';
+        if (mode !== 'object' && mode !== 'array') {
+            const ms = (typeof mode === 'object') ? JSON.stringify(mode) : mode;
+            throw new TypeError(`Query mode '${ms}' is invalid`);
+        }
     }
     if (handler) {
         if (typeof handler !== 'object')
             throw new TypeError('Query handler is invalid');
         if (typeof handler.parse !== 'function')
-            throw new TypeError('Query handler parser is invalid');
+            throw new TypeError('Query handler is invalid');
     }
     return { mask, mode, handler };
 }
 // UTILITY FUNCTIONS
 // ================================================================================================
-function formatQueryText(text) {
-    text = text.trim();
-    text += (text.charAt(text.length - 1) !== ';') ? ';\n' : '\n';
-    return text;
-}
 function isSafeString(value) {
     return (!value.includes('\'') && !value.includes(`\\`));
 }

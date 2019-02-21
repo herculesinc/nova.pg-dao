@@ -67,7 +67,6 @@ describe('NOVA.PG-DAO -> Query;', () => {
             const queryMaskInvalid = (mask: any): string => `Query mask '${mask}' is invalid`;
             const queryModeInvalid = (mode: any): string => `Query mode '${mode}' is invalid`;
             const notValidHandlerError= 'Query handler is invalid';
-            const notValidHandlerParserError= 'Query handler parser is invalid';
 
             [
                 // query text
@@ -86,8 +85,8 @@ describe('NOVA.PG-DAO -> Query;', () => {
                 {query: queryText, name: 'a', options: {mask: 'test'}, error: queryMaskInvalid('test')},
                 {query: queryText, name: 'a', options: {mask: null},   error: queryMaskInvalid(null)},
                 {query: queryText, name: 'a', options: {mask: 123},    error: queryMaskInvalid(123)},
-                {query: queryText, name: 'a', options: {mask: {}},     error: queryMaskInvalid({})},
-                {query: queryText, name: 'a', options: {mask: []},     error: queryMaskInvalid([])},
+                {query: queryText, name: 'a', options: {mask: {}},     error: queryMaskInvalid('{}')},
+                {query: queryText, name: 'a', options: {mask: []},     error: queryMaskInvalid('[]')},
 
                 // query mode
                 {query: queryText, name: 'a', options: {mask: 'list', mode: null},   error: queryModeInvalid(null)},
@@ -102,10 +101,10 @@ describe('NOVA.PG-DAO -> Query;', () => {
                 {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: 123},  error: notValidHandlerError},
                 {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: []},   error: notValidHandlerError},
 
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {}},            error: notValidHandlerParserError},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {parse: true}}, error: notValidHandlerParserError},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {parse: null}}, error: notValidHandlerParserError},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {parse: []}},   error: notValidHandlerParserError},
+                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {}},            error: notValidHandlerError},
+                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {parse: true}}, error: notValidHandlerError},
+                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {parse: null}}, error: notValidHandlerError},
+                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {parse: []}},   error: notValidHandlerError},
             ].forEach(({query, name, options, error}) => {
                 it(`name=${JSON.stringify(name)} and options=${JSON.stringify(options)}`, () => {
                     expect(() => Query.from(query as string, name as any, options as any)).to.throw(TypeError, error);
@@ -114,10 +113,10 @@ describe('NOVA.PG-DAO -> Query;', () => {
         });
     });
 
-    describe.only('\'Query.template\' method;', () => {
+    describe('\'Query.template\' method;', () => {
         describe('should return correct query object for:', () => {
             const queryTemplate = 'SELECT * FROM accounts WHERE id = {{id}}';
-            const queryText     = 'SELECT * FROM accounts WHERE id = 1;/n';
+            const queryText     = 'SELECT * FROM accounts WHERE id = 1;\n';
 
             [
                 {name: undefined, options: undefined},
@@ -166,7 +165,7 @@ describe('NOVA.PG-DAO -> Query;', () => {
             });
         });
 
-        describe.only('should return correct query text  and values for:', () => {
+        describe('should return correct query text  and values for:', () => {
             [
                 {
                     template: 'SELECT * FROM accounts WHERE id = {{id}}',

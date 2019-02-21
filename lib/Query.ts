@@ -289,8 +289,14 @@ function validateQueryArguments(text: string, nameOrOptions?: string | ResultQue
         }
     }
     else if (typeof nameOrOptions === 'object') {
+        if (Array.isArray(nameOrOptions)) {
+            throw new TypeError('Query name must be a string');
+        }
         qName = 'unnamed query';
         qOptions = validateQueryOptions(nameOrOptions);
+    }
+    else if (nameOrOptions) {
+        throw new TypeError('Query name must be a string');
     }
     else {
         qName = 'unnamed query';
@@ -300,18 +306,24 @@ function validateQueryArguments(text: string, nameOrOptions?: string | ResultQue
 }
 
 function validateQueryOptions({ mask, mode, handler}: ResultQueryOptions) {
-    if (mask !== 'list' && mask !== 'single') throw new TypeError(`Query mask '${mask}' is invalid`);
+    if (mask !== 'list' && mask !== 'single') {
+        const ms = (typeof mask === 'object') ? JSON.stringify(mask) : mask;
+        throw new TypeError(`Query mask '${ms}' is invalid`);
+    }
 
-    if (mode) {
-        if (mode !== 'object' && mode !== 'array') throw new TypeError(`Query mode '${mask}' is invalid`);
+    if (mode === undefined) {
+        mode = 'object';
     }
     else {
-        mode = 'object';
+        if (mode !== 'object' && mode !== 'array') {
+            const ms = (typeof mode === 'object') ? JSON.stringify(mode) : mode;
+            throw new TypeError(`Query mode '${ms}' is invalid`);
+        }
     }
 
     if (handler) {
         if (typeof handler !== 'object') throw new TypeError('Query handler is invalid');
-        if (typeof handler.parse !== 'function') throw new TypeError('Query handler parser is invalid');
+        if (typeof handler.parse !== 'function') throw new TypeError('Query handler is invalid');
     }
 
     return { mask, mode, handler };
@@ -319,12 +331,6 @@ function validateQueryOptions({ mask, mode, handler}: ResultQueryOptions) {
 
 // UTILITY FUNCTIONS
 // ================================================================================================
-function formatQueryText(text: string): string {
-    text = text.trim();
-    text += (text.charAt(text.length - 1) !== ';') ? ';\n' : '\n';
-    return  text;
-}
-
 function isSafeString(value: string): boolean {
     return (!value.includes('\'') && !value.includes(`\\`));
 }
