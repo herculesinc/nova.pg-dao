@@ -1,6 +1,5 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const util_1 = require("./util");
 ;
 // CLASS DEFINITION
 // ================================================================================================
@@ -10,6 +9,7 @@ class CustomResult {
     constructor(mask, handler) {
         this.rows = [];
         this.handler = handler;
+        this.complete = false;
         this.rowsToParse = (mask === 'single') ? 1 /* one */ : 2 /* many */;
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
@@ -19,7 +19,7 @@ class CustomResult {
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
     get isComplete() {
-        return (this.command !== undefined);
+        return this.complete;
     }
     // PUBLIC METHODS
     // --------------------------------------------------------------------------------------------
@@ -38,8 +38,8 @@ class CustomResult {
         const row = this.handler.parse(rowData);
         this.rows.push(row);
     }
-    complete(command) {
-        util_1.applyCommandComplete(this, command);
+    applyCommandComplete(command) {
+        this.complete = true;
     }
     end(error) {
         if (error)

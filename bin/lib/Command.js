@@ -70,7 +70,7 @@ class Command {
         }
     }
     handleCommandComplete(message, connection) {
-        this.results[this.cursor].complete(message.text);
+        this.results[this.cursor].applyCommandComplete(message);
         this.cursor++;
         if (this.isParameterized) {
             connection.sync();

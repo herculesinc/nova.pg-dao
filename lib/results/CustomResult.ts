@@ -1,8 +1,7 @@
 // IMPORTS
 // ================================================================================================
 import { QueryMask, ResultHandler } from '@nova/pg-dao';
-import { Result, FieldDescription } from './index';
-import { applyCommandComplete } from './util';
+import { Result, FieldDescription, CommandComplete } from './index';
 
 // INTERFACES
 // ================================================================================================
@@ -14,14 +13,11 @@ const enum RowsToParse {
 // ================================================================================================
 export class CustomResult implements Result {
 
-    oid?            : number;
-    command?        : string;
-    rowCount?       : number;
-
     readonly rows   : any[];
     readonly promise: Promise<any>;
     readonly handler: ResultHandler;
 
+    private complete    : boolean;
     private rowsToParse : RowsToParse;
     private resolve?    : (result?: any) => void;
     private reject?     : (error: Error) => void;
@@ -31,6 +27,7 @@ export class CustomResult implements Result {
     constructor(mask: QueryMask, handler: ResultHandler) {
         this.rows = [];
         this.handler = handler;
+        this.complete = false;
         this.rowsToParse = (mask === 'single') ? RowsToParse.one : RowsToParse.many;
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
@@ -41,7 +38,7 @@ export class CustomResult implements Result {
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
     get isComplete(): boolean {
-        return (this.command !== undefined);
+        return this.complete;
     }
 
     // PUBLIC METHODS
@@ -64,8 +61,8 @@ export class CustomResult implements Result {
         this.rows.push(row);
     }
 
-    complete(command: string) {
-        applyCommandComplete(this, command);
+    applyCommandComplete(command: CommandComplete) {
+        this.complete = true;
     }
 
     end(error?: Error) {

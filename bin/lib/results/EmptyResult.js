@@ -1,13 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const util_1 = require("./util");
+// MODULE VARIABLES
+// ================================================================================================
+const matchRegexp = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/;
 // CLASS DEFINITION
 // ================================================================================================
 class EmptyResult {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     constructor() {
-        this.rows = [];
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
             this.reject = reject;
@@ -26,8 +27,18 @@ class EmptyResult {
     addRow(rowData) {
         // do nothing
     }
-    complete(command) {
-        util_1.applyCommandComplete(this, command);
+    applyCommandComplete(command) {
+        const match = matchRegexp.exec(command.text);
+        if (match) {
+            this.command = match[1];
+            if (match[3]) {
+                this.oid = Number.parseInt(match[2], 10);
+                this.rowCount = Number.parseInt(match[3], 10);
+            }
+            else if (match[2]) {
+                this.rowCount = Number.parseInt(match[2], 10);
+            }
+        }
     }
     end(error) {
         if (error)

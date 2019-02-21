@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 // IMPORTS
 // ================================================================================================
 const pg_1 = require("pg");
-const util_1 = require("./util");
 // MODULE VARIABLES
 // ================================================================================================
 const getTypeParser = pg_1.types.getTypeParser;
@@ -17,6 +16,7 @@ class ObjectResult {
         this.rows = [];
         this.fields = [];
         this.parsers = [];
+        this.complete = false;
         this.rowsToParse = (mask === 'single') ? 1 /* one */ : 2 /* many */;
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
@@ -26,7 +26,7 @@ class ObjectResult {
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
     get isComplete() {
-        return (this.command !== undefined);
+        return this.complete;
     }
     // PUBLIC METHODS
     // --------------------------------------------------------------------------------------------
@@ -60,8 +60,8 @@ class ObjectResult {
         }
         this.rows.push(row);
     }
-    complete(command) {
-        util_1.applyCommandComplete(this, command);
+    applyCommandComplete(command) {
+        this.complete = true;
     }
     end(error) {
         if (error)

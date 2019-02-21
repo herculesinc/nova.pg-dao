@@ -2,8 +2,7 @@
 // ================================================================================================
 import { types } from 'pg';
 import { QueryMask } from '@nova/pg-dao';
-import { Result, FieldDescription } from './index';
-import { applyCommandComplete } from './util';
+import { Result, FieldDescription, CommandComplete } from './index';
 
 // MODULE VARIABLES
 // ================================================================================================
@@ -20,16 +19,13 @@ const enum RowsToParse {
 // ================================================================================================
 export class ObjectResult implements Result {
 
-    oid?            : number;
-    command?        : string;
-    rowCount?       : number;
-
     readonly rows   : any[];
     
     readonly fields : FieldDescription[];
     readonly parsers: FieldParser[];
     readonly promise: Promise<any>;
 
+    private complete    : boolean;
     private rowsToParse : RowsToParse;
     private resolve?    : (result?: any) => void;
     private reject?     : (error: Error) => void;
@@ -40,6 +36,7 @@ export class ObjectResult implements Result {
         this.rows = [];
         this.fields = [];
         this.parsers = [];
+        this.complete = false;
         this.rowsToParse = (mask === 'single') ? RowsToParse.one : RowsToParse.many;
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
@@ -50,7 +47,7 @@ export class ObjectResult implements Result {
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
     get isComplete(): boolean {
-        return (this.command !== undefined);
+        return this.complete;
     }
 
     // PUBLIC METHODS
@@ -87,8 +84,8 @@ export class ObjectResult implements Result {
         this.rows.push(row);
     }
 
-    complete(command: string) {
-        applyCommandComplete(this, command);
+    applyCommandComplete(command: CommandComplete) {
+        this.complete = true;
     }
 
     end(error?: Error) {

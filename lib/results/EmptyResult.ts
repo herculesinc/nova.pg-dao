@@ -1,7 +1,10 @@
 // IMPORTS
 // ================================================================================================
-import { Result, FieldDescription } from './index';
-import { applyCommandComplete } from './util';
+import { Result, FieldDescription, CommandComplete } from './index';
+
+// MODULE VARIABLES
+// ================================================================================================
+const matchRegexp = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/
 
 // CLASS DEFINITION
 // ================================================================================================
@@ -11,7 +14,6 @@ export class EmptyResult implements Result {
     command?        : string;
     rowCount?       : number;
 
-    readonly rows   : any[];
     readonly promise: Promise<any>;
 
     private resolve?: (result?: any) => void;
@@ -20,7 +22,6 @@ export class EmptyResult implements Result {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     constructor() {
-        this.rows = [];
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
             this.reject = reject;
@@ -43,8 +44,17 @@ export class EmptyResult implements Result {
         // do nothing
     }
 
-    complete(command: string) {
-        applyCommandComplete(this, command);
+    applyCommandComplete(command: CommandComplete) {
+        const match = matchRegexp.exec(command.text);
+        if (match) {
+            this.command = match[1];
+            if (match[3]) {
+                this.oid = Number.parseInt(match[2], 10);
+                this.rowCount = Number.parseInt(match[3], 10);
+            } else if (match[2]) {
+                this.rowCount = Number.parseInt(match[2], 10);
+            }
+        }
     }
 
     end(error?: Error) {
