@@ -1,0 +1,21 @@
+{
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/CVS": true,
+    "**/.DS_Store": true,
+    ".gitignore": true,
+    ".gitattributes": true,
+    ".npmignore": true,
+    "package-lock.json": true,
+    "**/*.js.map": true
+  },
+  "search.exclude": {
+      "**/node_modules": true,
+      "**/*.js": true,
+      "**/bin": true,
+      "**/obj": true,
+      "package-lock.json": true
+  }
+}
