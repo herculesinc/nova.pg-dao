@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const results_1 = require("./results");
+const errors_1 = require("./errors");
 const util_1 = require("./util");
 // CLASS DEFINITION
 // ================================================================================================
@@ -24,14 +25,24 @@ class Command {
     // PUBLIC METHODS
     // --------------------------------------------------------------------------------------------
     add(query) {
-        // TODO: validate query
-        this.text = this.text + query.text;
+        if (!query)
+            throw new TypeError('Cannot add query to command: query is undefined');
+        if (this.values) {
+            throw new errors_1.QueryError('Cannot add query to command: command already contains parameterized query');
+        }
+        this.text = this.text + validateQueryText(query.text);
         this.queries.push(query);
         if (query.values) {
+            if (!Array.isArray(query.values)) {
+                throw new errors_1.QueryError(`Query values must be an array`);
+            }
             this.values = [];
             for (let value of query.values) {
                 this.values.push(util_1.prepareValue(value));
             }
+        }
+        else if (query.values !== undefined) {
+            throw new errors_1.QueryError(`Query values must be an array`);
         }
         const result = results_1.createResult(query);
         this.results.push(result);
@@ -40,7 +51,9 @@ class Command {
     // QUERY METHODS
     // --------------------------------------------------------------------------------------------
     submit(connection) {
-        // TODO: validate text / values
+        if (!this.text) {
+            throw new errors_1.QueryError('Cannot submit a command: query text is missing');
+        }
         this.start = Date.now();
         if (this.isParameterized) {
             connection.parse({ text: this.text }, true);
@@ -54,8 +67,11 @@ class Command {
         }
     }
     handleRowDescription(message) {
+        if (this.canceledDueToError)
+            return;
         if (this.cursor >= this.results.length) {
-            // TODO: throw error
+            this.canceledDueToError = new errors_1.QueryError('A query cannot contain multiple statements');
+            return;
         }
         this.results[this.cursor].addFields(message.fields);
     }
@@ -65,8 +81,9 @@ class Command {
         try {
             this.results[this.cursor].addRow(message.fields);
         }
-        catch (err) {
-            this.canceledDueToError = err;
+        catch (error) {
+            const query = this.queries[this.cursor];
+            this.canceledDueToError = new errors_1.ParseError(`Failed to parse results for ${query.name} query`, error);
         }
     }
     handleCommandComplete(message, connection) {
@@ -78,7 +95,8 @@ class Command {
     }
     handleReadyForQuery(connection) {
         if (this.canceledDueToError) {
-            return this.handleError(this.canceledDueToError, connection);
+            this.handleError(this.canceledDueToError, connection);
+            return;
         }
         const ts = Date.now();
         for (let i = 0; i < this.results.length; i++) {
@@ -108,10 +126,13 @@ class Command {
         }
     }
     handlePortalSuspended(connection) {
+        throw new errors_1.QueryError('Handling of portalSuspended messages is not supported');
     }
     handleCopyInResponse(connection) {
+        throw new errors_1.QueryError('Handling of copyInResponse messages is not supported');
     }
     handleCopyData(message, connection) {
+        throw new errors_1.QueryError('Handling of copyData messages is not supported');
     }
 }
 exports.Command = Command;
@@ -122,5 +143,16 @@ function buildTraceCommand(query, logQueryText) {
         name: query.name || 'unnamed',
         text: logQueryText ? query.text : undefined
     };
+}
+function validateQueryText(text) {
+    if (typeof text !== 'string')
+        throw new TypeError('Query text must be a string');
+    text = text.trim();
+    if (text === '')
+        throw new TypeError('Query text cannot be an empty string');
+    if (text.charAt(text.length - 1) !== ';') {
+        text = text + ';';
+    }
+    return text;
 }
 //# sourceMappingURL=Command.js.map

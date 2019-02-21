@@ -39,6 +39,7 @@ class ArrayResult {
         }
     }
     addRow(rowData) {
+        // no need to parse more than 1 row for 'single' query mask
         if (this.rowsToParse < 2 /* many */) {
             if (this.rowsToParse === 1 /* one */) {
                 this.rowsToParse = 0 /* zero */;

@@ -62,6 +62,7 @@ export class ObjectResult implements Result {
     }
 
     addRow(rowData: any[])  {
+        // no need to parse more than 1 row for 'single' query mask
         if (this.rowsToParse < RowsToParse.many) {
             if (this.rowsToParse === RowsToParse.one) {
                 this.rowsToParse = RowsToParse.zero;

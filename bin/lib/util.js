@@ -1,5 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+// PARAMETER PREPARATION
+// ================================================================================================
 function prepareValue(value) {
     if (value instanceof Buffer) {
         return value;
@@ -45,10 +47,10 @@ function arrayString(value) {
     return result;
 }
 function escapeElement(elementRepresentation) {
-    let escaped = elementRepresentation
+    const escaped = elementRepresentation
         .replace(/\\/g, '\\\\')
         .replace(/"/g, '\\"');
-    return '"' + escaped + '"';
+    return `"${escaped}"`;
 }
 function dateToString(date) {
     let offset = -date.getTimezoneOffset();

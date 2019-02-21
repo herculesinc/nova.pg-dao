@@ -1,3 +1,5 @@
+// PARAMETER PREPARATION
+// ================================================================================================
 export function prepareValue(value: any) {
     if (value instanceof Buffer) {
         return value;
@@ -43,11 +45,11 @@ function arrayString(value: any[]) {
 }
 
 function escapeElement(elementRepresentation: string) {
-    let escaped = elementRepresentation
+    const escaped = elementRepresentation
         .replace(/\\/g, '\\\\')
         .replace(/"/g, '\\"');
 
-    return '"' + escaped + '"';
+    return `"${escaped}"`;
 }
 
 function dateToString(date: Date) {
