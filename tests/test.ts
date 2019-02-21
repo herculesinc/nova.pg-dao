@@ -63,7 +63,7 @@ function extractId(row: any): string {
     const template4 = Query.template(paramQueryText4, 'template4', listQueryOptions);
     const query8 = new template4({ id: ["123", "456"] });
     console.log(JSON.stringify(query8));
-});
+})();
 
 // DATABASE TESTS
 // ================================================================================================
@@ -85,11 +85,11 @@ const database = new Database({
     const query1 = Query.from('SELECT id FROM tokens LIMIT 5;', { mask: 'list' })
     const result1 = await session.execute(query1);
     console.log(JSON.stringify(result1));
-   
+
     const template1 = Query.template('SELECT id, status, handle FROM accounts WHERE profile = {{profile}} LIMIT 5', { mask: 'list' });
     const query2 = new template1({ profile: `test's` });
     const result2 = await session.execute(query2);
     console.log(JSON.stringify(result2));
 
     await session.close('commit');
-})();
+});

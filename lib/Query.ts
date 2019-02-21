@@ -1,6 +1,6 @@
 // IMPORTS
 // ================================================================================================
-import { 
+import {
     QueryMode, QueryMask, QueryTemplate, ResultQuery, ResultQueryOptions, ResultHandler,
     ListResultQuery, ListResultQueryOptions, SingleResultQuery, SingleResultQueryOptions
 } from '@nova/pg-dao';
@@ -68,7 +68,7 @@ export namespace Query {
         const validated = validateQueryArguments(text, nameOrOptions, options);
         const textParts = validated.text.split(PARAM_PATTERN);
         if (textParts.length < 2) throw new QueryError('Query text must contain at least one parameter');
-        
+
         const paramMatches = text.match(PARAM_PATTERN) as RegExpMatchArray;
         const paramSpecs: ParamSpec[] = [];
         for (let match of paramMatches) {
@@ -107,7 +107,7 @@ function buildQueryTemplate<T>(name: string, textParts: string[], paramSpecs: Pa
         readonly values?    : any[];
         readonly handler?   : ResultHandler<T>;
 
-        constructor(params: any) {            
+        constructor(params: any) {
             if (!params) throw new TypeError('Query params are undefined');
             if (typeof params !== 'object') throw new TypeError('Query params must be an object');
 
@@ -177,7 +177,7 @@ function stringifyRawSingleParam(value: any, values: string[]) {
 
 function stringifySingleParam(value: any, values: string[]): string {
     if (value === undefined || value === null) return 'null';
-    
+
     switch (typeof value) {
         case 'number': case 'boolean': {
             return value.toString();
@@ -215,16 +215,16 @@ function stringifySingleParam(value: any, values: string[]): string {
 
 function stringifyRawArrayParam(array: any[], values: string[]): string {
     if (array === undefined || array === null || array.length === 0) return 'null';
-    
+
     const paramValues: string[] = [];
     const arrayType = typeof array[0];
     for (let value of array) {
         if (value === undefined || value === null) continue;
-        
+
         let valueType = typeof value;
         if (valueType !== arrayType)
             throw new Error('Query parameter cannot be an array of mixed values');
-        
+
         if (valueType === 'string') {
             paramValues.push(value);
         }
@@ -235,23 +235,23 @@ function stringifyRawArrayParam(array: any[], values: string[]): string {
             throw new Error(`Query parameter array cannot contain ${valueType} values`);
         }
     }
-    
+
     return paramValues.join(',');
 }
 
 function stringifyArrayParam(array: any[], values: string[]): string {
     if (array === undefined || array === null || array.length === 0) return 'null';
     if (!Array.isArray(array)) throw new Error('Query parameter must be an array');
-    
+
     const paramValues: string[] = [];
     const arrayType = typeof array[0];
     for (let value of array) {
         if (value === undefined || value === null) continue;
-        
+
         let valueType = typeof value;
         if (valueType !== arrayType)
             throw new Error('Query parameter cannot be an array of mixed values');
-        
+
         if (valueType === 'string') {
             if (isSafeString(value)) {
                 paramValues.push('\'' + value + '\'');
@@ -267,7 +267,7 @@ function stringifyArrayParam(array: any[], values: string[]): string {
             throw new Error(`Query parameter array cannot contain ${valueType} values`);
         }
     }
-    
+
     return paramValues.join(',');
 }
 
@@ -278,7 +278,7 @@ function validateQueryArguments(text: string, nameOrOptions?: string | ResultQue
     let qText = text.trim();
     if (qText === '') throw new TypeError('Query text cannot be an empty string');
     qText += (qText.charAt(qText.length - 1) !== ';') ? ';\n' : '\n';
-    
+
     let qName: string;
     let qOptions: ResultQueryOptions | undefined;
     if (typeof nameOrOptions === 'string') {
@@ -301,7 +301,7 @@ function validateQueryArguments(text: string, nameOrOptions?: string | ResultQue
 
 function validateQueryOptions({ mask, mode, handler}: ResultQueryOptions) {
     if (mask !== 'list' && mask !== 'single') throw new TypeError(`Query mask '${mask}' is invalid`);
-    
+
     if (mode) {
         if (mode !== 'object' && mode !== 'array') throw new TypeError(`Query mode '${mask}' is invalid`);
     }
