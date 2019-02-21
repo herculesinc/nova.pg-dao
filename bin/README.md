@@ -1,10 +1,10 @@
-# Nova Core
-Core interfaces and classes for Nova API framework.
+# Nova PostgreSQL DAO
+PostgreSQL data access object for Nova framework.
 
 ## Install
 
 ```sh
-$ npm install --save @nova/core
+$ npm install --save @nova/pg-dao
 ```
 
 ## License

@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@nova/core": "0.2.x",
-    "pg": "^7.8.0"
+    "pg": "7.8.x"
   },
   "devDependencies": {
     "@types/node": "10.12.x",

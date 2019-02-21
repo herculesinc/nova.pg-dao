@@ -69,12 +69,12 @@ function extractId(row: any): string {
 // ================================================================================================
 const database = new Database({
     connection: {
-        database    : "credotest",
-        host        : "credo-dev.postgres.database.azure.com",
+        database    : "",
+        host        : "",
         port        : 5432,
         ssl         : true,
-        user        : "credoapi@credo-dev",
-        password    : "H)!C4$PbEd5K"
+        user        : "",
+        password    : ""
     }
 });
 
