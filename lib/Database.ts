@@ -2,7 +2,7 @@
 // =================================================================================================
 import * as nova from '@nova/core';
 import { EventEmitter } from 'events';
-import { DatabaseConfig, ConnectionSettings, PoolOptions, SessionOptions, TraceSource } from '@nova/pg-dao';
+import { DatabaseConfig, ConnectionSettings, PoolOptions, PoolState, SessionOptions, TraceSource } from '@nova/pg-dao';
 import { Pool, ClientConfig } from 'pg';
 import { DaoSession } from './Session';
 import { defaults } from './defaults';
@@ -43,6 +43,15 @@ export class Database extends EventEmitter {
 
     close(): Promise<any> {
         return this.pool.end();
+    }
+
+    // POOL INFO ACCESSORS
+    // --------------------------------------------------------------------------------------------
+    getPoolState(): PoolState {
+        return {
+            size    : this.pool.pool.totalCount,
+            idle    : this.pool.pool.idleCount
+        };
     }
 }
 

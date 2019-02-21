@@ -36,6 +36,14 @@ class Database extends events_1.EventEmitter {
     close() {
         return this.pool.end();
     }
+    // POOL INFO ACCESSORS
+    // --------------------------------------------------------------------------------------------
+    getPoolState() {
+        return {
+            size: this.pool.pool.totalCount,
+            idle: this.pool.pool.idleCount
+        };
+    }
 }
 exports.Database = Database;
 // HELPER FUNCTIONS

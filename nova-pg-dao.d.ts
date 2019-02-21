@@ -31,6 +31,11 @@ declare module "@nova/pg-dao" {
         reapInterval?   : number;
     }
 
+    export interface PoolState {
+        size    : number;
+        idle    : number;
+    }
+
     export interface SessionOptions {
         readonly        : boolean;
         logQueryText    : boolean;
@@ -40,6 +45,8 @@ declare module "@nova/pg-dao" {
 
         constructor(config: DatabaseConfig);
 
+        getPoolState(): PoolState;
+        
         getSession(options?: Partial<SessionOptions>, logger?: Logger): DaoSession;
         close(): Promise<any>;
 
