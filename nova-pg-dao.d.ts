@@ -32,8 +32,8 @@ declare module "@nova/pg-dao" {
     }
 
     export interface PoolState {
-        size    : number;
-        idle    : number;
+        readonly size   : number;
+        readonly idle   : number;
     }
 
     export interface SessionOptions {

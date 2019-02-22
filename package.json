@@ -26,11 +26,11 @@
     "node": "10.15.x"
   },
   "dependencies": {
-    "@nova/core": "0.2.x",
+    "@nova/core": "0.3.x",
     "pg": "7.8.x"
   },
   "devDependencies": {
-    "@types/chai": "^4.1.7",
+    "@types/chai": "4.1.x",
     "@types/mocha": "5.2.x",
     "@types/node": "10.12.x",
     "chai": "4.2.x",
