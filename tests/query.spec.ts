@@ -40,13 +40,6 @@ describe('NOVA.PG-DAO -> Query;', () => {
                         expect(query.mask).to.be.undefined;
                     }
 
-                    // mode
-                    if (options) {
-                        expect(query.mode).to.equal(options.mode || 'object');
-                    } else {
-                        expect(query.mode).to.be.undefined;
-                    }
-
                     // handler
                     if (options && options.handler) {
                         expect(query.handler).to.equal(options.handler);
@@ -143,13 +136,6 @@ describe('NOVA.PG-DAO -> Query;', () => {
                         expect(query.mask).to.equal(options.mask);
                     } else {
                         expect(query.mask).to.be.undefined;
-                    }
-
-                    // mode
-                    if (options) {
-                        expect(query.mode).to.equal(options.mode || 'object');
-                    } else {
-                        expect(query.mode).to.be.undefined;
                     }
 
                     // handler

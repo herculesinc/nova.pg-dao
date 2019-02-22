@@ -1,6 +1,6 @@
 // IMPORTS
 // ================================================================================================
-import { Dao, Query, SessionOptions, Logger, TraceSource } from '@nova/pg-dao';
+import { Dao, Query, SingleResultQuery, ListResultQuery, SessionOptions, Logger, TraceSource } from '@nova/pg-dao';
 import { Client } from 'pg';
 import { ConnectionError } from './errors';
 import { Command } from './Command';
@@ -99,6 +99,10 @@ export class DaoSession implements Dao {
 
     // EXECUTE METHOD
     // --------------------------------------------------------------------------------------------
+    
+    async execute<T>(query: ListResultQuery<T>): Promise<T[]>
+    async execute<T>(query: SingleResultQuery<T>): Promise<T | undefined>
+    async execute(query: Query<void>): Promise<void>
     async execute<T>(query: Query<T>): Promise<any> {
         if (!this.isActive) {
             throw new ConnectionError('Cannot execute a query: session is closed');

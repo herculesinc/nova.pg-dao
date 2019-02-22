@@ -61,7 +61,7 @@ declare module "@nova/pg-dao" {
         readonly isActive       : boolean;
         readonly isReadOnly     : boolean;
         
-        execute<T>(query: SingleResultQuery<T>) : Promise<T>;
+        execute<T>(query: SingleResultQuery<T>) : Promise<T | undefined>;
         execute<T>(query: ListResultQuery<T>)   : Promise<T[]>;
         execute(query: Query<void>)             : Promise<void>;
 
@@ -87,37 +87,39 @@ declare module "@nova/pg-dao" {
     // QUERY
     // --------------------------------------------------------------------------------------------
     export type QueryMask = 'list' | 'single';
-    export type QueryMode = 'object' | 'array';
+    export type QueryHandler<T=any> = typeof Object | typeof Array | ResultHandler<T>;
 
     export interface Query<T=any> {
         readonly text       : string;
         readonly name?      : string;
-        readonly mode?      : QueryMode;
         readonly mask?      : QueryMask;
         readonly values?    : any[];
-        readonly handler?   : ResultHandler<T>;
+        readonly handler?   : QueryHandler<T>;
     }
 
     export const Query: {
         from(text: string): Query<void>;
         from(text: string, name: string): Query<void>;
-        from<T>(text: string, options?: ListResultQueryOptions<T>): ListResultQuery<T>;
-        from<T>(text: string, name: string, options?: ListResultQueryOptions<T>): ListResultQuery<T>;
-        from<T>(text: string, options?: SingleResultQueryOptions<T>): SingleResultQuery<T>;
-        from<T>(text: string, name: string, options?: SingleResultQueryOptions<T>): SingleResultQuery<T>;
+        from<T=any>(text: string, name: string, mask: 'list'): ListResultQuery<T>;        
+        from<T=any>(text: string, name: string, options: ListResultQueryOptions<T>): ListResultQuery<T>;
+        from<T=any>(text: string, options: ListResultQueryOptions<T>): ListResultQuery<T>;
+        from<T=any>(text: string, name: string, mask: 'single'): SingleResultQuery<T>;
+        from<T=any>(text: string, name: string, options: SingleResultQueryOptions<T>): SingleResultQuery<T>;
+        from<T=any>(text: string, options: SingleResultQueryOptions<T>): SingleResultQuery<T>;
 
         template(text: string): QueryTemplate<Query<void>>;
         template(text: string, name: string): QueryTemplate<Query<void>>;
-        template<T>(text: string, options?: ListResultQueryOptions<T>): QueryTemplate<ListResultQuery<T>>;
-        template<T>(text: string, name: string, options?: ListResultQueryOptions<T>): QueryTemplate<ListResultQuery<T>>;
-        template<T>(text: string, options?: SingleResultQueryOptions<T>): QueryTemplate<SingleResultQuery<T>>;
-        template<T>(text: string, name: string, options?: SingleResultQueryOptions<T>): QueryTemplate<SingleResultQuery<T>>;
+        template<T=any>(text: string, name: string, mask: 'list'): QueryTemplate<ListResultQuery<T>>;
+        template<T=any>(text: string, name: string, options: ListResultQueryOptions<T>): QueryTemplate<ListResultQuery<T>>;
+        template<T=any>(text: string, options: ListResultQueryOptions<T>): QueryTemplate<ListResultQuery<T>>;
+        template<T=any>(text: string, name: string, mask: 'single'): QueryTemplate<SingleResultQuery<T>>;
+        template<T=any>(text: string, name: string, options: SingleResultQueryOptions<T>): QueryTemplate<SingleResultQuery<T>>;
+        template<T=any>(text: string, options: SingleResultQueryOptions<T>): QueryTemplate<SingleResultQuery<T>>;
     }
     
     export interface ResultQuery<T=any> extends Query<T> {
         readonly mask       : QueryMask;
-        readonly mode?      : QueryMode;
-        readonly handler?   : ResultHandler<T>;
+        readonly handler    : QueryHandler<T>;
     }
     
     export interface SingleResultQuery<T=any> extends ResultQuery<T> {
@@ -129,21 +131,19 @@ declare module "@nova/pg-dao" {
     }
     
     export interface ResultQueryOptions<T=any> {
+        readonly name?      : string;
         readonly mask       : QueryMask;
-        readonly mode?      : QueryMode;
-        readonly handler?   : ResultHandler<T>;
+        readonly handler?   : QueryHandler<T>;
     }
     
     export interface SingleResultQueryOptions<T=any> extends ResultQueryOptions<T> {
         readonly mask       : 'single';
-        readonly mode?      : QueryMode;
-        readonly handler?   : ResultHandler<T>;
+        readonly handler?   : QueryHandler<T>;
     }
     
     export interface ListResultQueryOptions<T=any> extends ResultQueryOptions<T> {
         readonly mask       : 'list';
-        readonly mode?      : QueryMode;
-        readonly handler?   : ResultHandler<T>;
+        readonly handler?   : QueryHandler<T>;
     }
     
     export interface QueryTemplate<T extends Query> {

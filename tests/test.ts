@@ -1,7 +1,7 @@
 // IMPORTS
 // ================================================================================================
 import { Database, Query } from '../index';
-import { ListResultQueryOptions, SingleResultQueryOptions } from '@nova/pg-dao';
+import { ListResultQueryOptions, SingleResultQueryOptions, ResultHandler } from '@nova/pg-dao';
 
 // MODULE VARIABLES
 // ================================================================================================
@@ -24,6 +24,12 @@ const singleQueryOptions: SingleResultQueryOptions<string> = {
         parse   : extractId
     }
 };
+
+const IdHandler: ResultHandler<string> = {
+    parse(rowData: string[]) {
+        return rowData[0];
+    }
+}
 
 function extractId(row: any): string {
     return row.id;
@@ -63,7 +69,7 @@ function extractId(row: any): string {
     const template4 = Query.template(paramQueryText4, 'template4', listQueryOptions);
     const query8 = new template4({ id: ["123", "456"] });
     console.log(JSON.stringify(query8));
-})();
+});
 
 // DATABASE TESTS
 // ================================================================================================
@@ -82,14 +88,18 @@ const database = new Database({
 
     const session = database.getSession();
 
-    const query1 = Query.from('SELECT id FROM tokens LIMIT 5;', { mask: 'list' })
-    const result1 = await session.execute(query1);
-    console.log(JSON.stringify(result1));
+    const query1 = Query.from('SELECT id FROM tokens LIMIT 5;', { name: 'query1', mask: 'list', handler: IdHandler })
+    const result1 = session.execute(query1);
 
-    const template1 = Query.template('SELECT id, status, handle FROM accounts WHERE profile = {{profile}} LIMIT 5', { mask: 'list' });
-    const query2 = new template1({ profile: `test's` });
-    const result2 = await session.execute(query2);
-    console.log(JSON.stringify(result2));
+    const query2 = Query.from('SELECT status FROM tokens LIMIT 5;', 'query2', { mask: 'list' })
+    const result2 = session.execute(query2);
 
+    const template1 = Query.template('SELECT id, status, handle FROM accounts WHERE profile = {{profile}} LIMIT 5', { mask: 'single', handler: IdHandler });
+    const query3 = new template1({ profile: `test's` });
+    const result3 = session.execute(query3);
+
+    const results = await Promise.all([result1, result2, result3 ]);
+    console.log(JSON.stringify(results));
+    
     await session.close('commit');
-});
+})();

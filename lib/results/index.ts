@@ -1,6 +1,6 @@
 // IMPORTS
 // ================================================================================================
-import { QueryMask, QueryMode, ResultHandler } from '@nova/pg-dao';
+import { QueryMask, QueryHandler, ResultHandler } from '@nova/pg-dao';
 import { ArrayResult } from './ArrayResult';
 import { ObjectResult } from './ObjectResult';
 import { CustomResult } from './CustomResult';
@@ -38,23 +38,31 @@ export interface CommandComplete {
 
 interface ResultOptions {
     mask?           : QueryMask;
-    mode?           : QueryMode;
-    handler?        : ResultHandler;
+    handler?        : QueryHandler;
 }
 
 // PUBLIC FUNCTIONS
 // ================================================================================================
 export function createResult(options: ResultOptions): Result {
-    if (options.mode === 'array') {
-        return new ArrayResult(options.mask || 'list');
-    }
-    else if (options.mode === 'object') {
-        return new ObjectResult(options.mask || 'list');
-    }
-    else if (options.handler) {
-        return new CustomResult(options.mask || 'list', options.handler);
+
+    if (options.handler) {
+        const handler = options.handler;
+        if (handler === Object) {
+            return new ObjectResult(options.mask || 'list');
+        }
+        else if (handler === Array) {
+            return new ArrayResult(options.mask || 'list');
+        }
+        else {
+            return new CustomResult(options.mask || 'list', handler as ResultHandler);
+        }
     }
     else {
-        return new EmptyResult();
+        if (options.mask) {
+            return new ObjectResult(options.mask);
+        }
+        else {
+            return new EmptyResult();
+        }
     }
 }

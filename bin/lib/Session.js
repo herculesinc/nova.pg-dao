@@ -62,8 +62,6 @@ class DaoSession {
         if (closeError)
             throw closeError;
     }
-    // EXECUTE METHOD
-    // --------------------------------------------------------------------------------------------
     async execute(query) {
         if (!this.isActive) {
             throw new errors_1.ConnectionError('Cannot execute a query: session is closed');
