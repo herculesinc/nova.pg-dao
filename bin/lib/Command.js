@@ -48,8 +48,6 @@ class Command {
         this.results.push(result);
         return result.promise;
     }
-    // QUERY METHODS
-    // --------------------------------------------------------------------------------------------
     submit(connection) {
         if (!this.text) {
             throw new errors_1.QueryError('Cannot submit a command: query text is missing');
@@ -66,6 +64,19 @@ class Command {
             connection.query(this.text);
         }
     }
+    abort(error) {
+        if (this.start) {
+            throw new errors_1.QueryError('Cannot abort a command: execution already started');
+        }
+        const ts = Date.now();
+        for (let i = 0; i < this.results.length; i++) {
+            const command = buildTraceCommand(this.queries[i], this.logQueryText);
+            this.logger.trace(this.source, command, ts - this.start, false);
+            this.results[i].end(error);
+        }
+    }
+    // MESSAGE HANDLERS
+    // --------------------------------------------------------------------------------------------
     handleRowDescription(message) {
         if (this.canceledDueToError)
             return;

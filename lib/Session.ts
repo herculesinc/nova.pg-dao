@@ -8,8 +8,8 @@ import { Command } from './Command';
 // INTERFACES AND ENUMS
 // ================================================================================================
 const enum DaoState {
-    pending = 1, active, closing, closed
-};
+    pending = 1, connecting, active, closing, closed
+}
 
 interface SessionFactory {
     connect(): Promise<Client>;
@@ -24,6 +24,7 @@ export class DaoSession implements Dao {
 
     private state                   : DaoState;
     private client?                 : Client;
+    private commands                : Command[];
 
     private readonly logger         : Logger;
     private readonly readonly       : boolean;
@@ -42,6 +43,7 @@ export class DaoSession implements Dao {
 
         this.state = DaoState.pending;
         this.client = undefined;
+        this.commands = [];
     }
 
     // PUBLIC ACCESSORS
@@ -102,11 +104,19 @@ export class DaoSession implements Dao {
             throw new ConnectionError('Cannot execute a query: session is closed');
         }
 
-        // create a command
-        const command = new Command(this.logger, this.source, this.logQueryText);
+        let firstCommand: Command | undefined;
 
-        // connect to the database and start a transaction
-        if (!this.inTransaction) {
+        // make sure sessions starts out with BEGIN statement
+        if (this.state === DaoState.pending) {
+            firstCommand = this.queueFirstCommand();
+            this.state = DaoState.connecting;
+        }
+
+        // add query to the command
+        const result = this.appendToCommandQueue(query, firstCommand);
+
+        // connect to database, but only if the BEGIN statement was queued in this context
+        if (firstCommand) {
             const start = Date.now();
             try {
                 this.logger.debug('Connecting to the database');
@@ -115,25 +125,76 @@ export class DaoSession implements Dao {
             }
             catch(error) {
                 this.logger.trace(this.source, 'connect', Date.now() - start, false);
-                throw new ConnectionError('Cannot execute a query: database connection failed', error);
-            }
+                error = new ConnectionError('Cannot execute a query: database connection failed', error);
 
-            const txStartQuery = this.readonly ? BEGIN_RO_TRANSACTION : BEGIN_RW_TRANSACTION;
-            command.add(txStartQuery).catch((error) => {
-                // TODO: log error?
-            });
+                // make all queued commands resolve to an error
+                process.nextTick(() => {
+                    for (let command of this.commands) {
+                        command.abort(error);
+                    }
+                });
+
+                // result will resolve to an error on next tick
+                return result;
+            }
             this.state = DaoState.active;
         }
 
-        // execute query
-        const result = command.add(query);
-        this.client!.query(command as any);
+        // execute the entire command queue on next tick
+        if (this.state === DaoState.active) {
+            process.nextTick(() => {
+                const commands = this.commands;
+                this.commands = [];
+    
+                for (let command of commands) {
+                    this.client!.query(command as any);
+                }
+            });
+        }
         
+        // return the result
         return result;
     }
 
     // PRIVATE METHODS
     // --------------------------------------------------------------------------------------------
+    private queueFirstCommand(): Command {
+        // create a command and add it to the command queue
+        const command = new Command(this.logger, this.source, this.logQueryText);
+        this.commands.push(command);
+
+        // add begin transaction query to the command
+        const txStartQuery = this.readonly ? BEGIN_RO_TRANSACTION : BEGIN_RW_TRANSACTION;
+        command.add(txStartQuery).catch((error) => {
+            // TODO: log error?
+        });
+        return command;
+    }
+
+    private appendToCommandQueue(query: Query, firstCommand?: Command): Promise<any> {
+        let result: any;
+        if (query.values) {
+            // if parameterized query, it must start a new command
+            const command = new Command(this.logger, this.source, this.logQueryText);
+            this.commands.push(command);
+            result = command.add(query);;
+        }
+        else if (firstCommand) {
+            result = firstCommand.add(query);
+        }
+        else {
+            // try to append the query to the last command in the queue
+            let command = this.commands[this.commands.length - 1];
+            if (!command || command.isParameterized) {
+                command = new Command(this.logger, this.source, this.logQueryText);
+                this.commands.push(command);
+            }
+            result = command.add(query);;
+        }
+
+        return result;
+    }
+
     private releaseClient(error?: Error) {
         this.state = DaoState.closed;
         if (this.client) {

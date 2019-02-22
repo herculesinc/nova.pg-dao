@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const errors_1 = require("./errors");
 const Command_1 = require("./Command");
-;
 // CLASS DEFINITION
 // ================================================================================================
 class DaoSession {
@@ -16,6 +15,7 @@ class DaoSession {
         this.logger = logger;
         this.state = 1 /* pending */;
         this.client = undefined;
+        this.commands = [];
     }
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
@@ -23,10 +23,10 @@ class DaoSession {
         return this.readonly;
     }
     get inTransaction() {
-        return (this.state === 2 /* active */);
+        return (this.state === 3 /* active */);
     }
     get isActive() {
-        return (this.state <= 2 /* active */);
+        return (this.state <= 3 /* active */);
     }
     // CLOSE METHODS
     // --------------------------------------------------------------------------------------------
@@ -38,7 +38,7 @@ class DaoSession {
             throw new errors_1.ConnectionError(`Cannot close session: '${action}' action is invalid`);
         }
         if (!this.inTransaction) {
-            this.state = 4 /* closed */;
+            this.state = 5 /* closed */;
             return;
         }
         let closeError;
@@ -52,7 +52,7 @@ class DaoSession {
                 this.logger.debug('Committing and closing session');
                 closePromise = this.execute(ROLLBACK_TRANSACTION);
             }
-            this.state = 3 /* closing */;
+            this.state = 4 /* closing */;
             await closePromise;
         }
         catch (error) {
@@ -68,10 +68,16 @@ class DaoSession {
         if (!this.isActive) {
             throw new errors_1.ConnectionError('Cannot execute a query: session is closed');
         }
-        // create a command
-        const command = new Command_1.Command(this.logger, this.source, this.logQueryText);
-        // connect to the database and start a transaction
-        if (!this.inTransaction) {
+        let firstCommand;
+        // make sure sessions starts out with BEGIN statement
+        if (this.state === 1 /* pending */) {
+            firstCommand = this.queueFirstCommand();
+            this.state = 2 /* connecting */;
+        }
+        // add query to the command
+        const result = this.appendToCommandQueue(query, firstCommand);
+        // connect to database, but only if the BEGIN statement was queued in this context
+        if (firstCommand) {
             const start = Date.now();
             try {
                 this.logger.debug('Connecting to the database');
@@ -80,23 +86,70 @@ class DaoSession {
             }
             catch (error) {
                 this.logger.trace(this.source, 'connect', Date.now() - start, false);
-                throw new errors_1.ConnectionError('Cannot execute a query: database connection failed', error);
+                error = new errors_1.ConnectionError('Cannot execute a query: database connection failed', error);
+                // make all queued commands resolve to an error
+                process.nextTick(() => {
+                    for (let command of this.commands) {
+                        command.abort(error);
+                    }
+                });
+                // result will resolve to an error on next tick
+                return result;
             }
-            const txStartQuery = this.readonly ? BEGIN_RO_TRANSACTION : BEGIN_RW_TRANSACTION;
-            command.add(txStartQuery).catch((error) => {
-                // TODO: log error?
-            });
-            this.state = 2 /* active */;
+            this.state = 3 /* active */;
         }
-        // execute query
-        const result = command.add(query);
-        this.client.query(command);
+        // execute the entire command queue on next tick
+        if (this.state === 3 /* active */) {
+            process.nextTick(() => {
+                const commands = this.commands;
+                this.commands = [];
+                for (let command of commands) {
+                    this.client.query(command);
+                }
+            });
+        }
+        // return the result
         return result;
     }
     // PRIVATE METHODS
     // --------------------------------------------------------------------------------------------
+    queueFirstCommand() {
+        // create a command and add it to the command queue
+        const command = new Command_1.Command(this.logger, this.source, this.logQueryText);
+        this.commands.push(command);
+        // add begin transaction query to the command
+        const txStartQuery = this.readonly ? BEGIN_RO_TRANSACTION : BEGIN_RW_TRANSACTION;
+        command.add(txStartQuery).catch((error) => {
+            // TODO: log error?
+        });
+        return command;
+    }
+    appendToCommandQueue(query, firstCommand) {
+        let result;
+        if (query.values) {
+            // if parameterized query, it must start a new command
+            const command = new Command_1.Command(this.logger, this.source, this.logQueryText);
+            this.commands.push(command);
+            result = command.add(query);
+            ;
+        }
+        else if (firstCommand) {
+            result = firstCommand.add(query);
+        }
+        else {
+            // try to append the query to the last command in the queue
+            let command = this.commands[this.commands.length - 1];
+            if (!command || command.isParameterized) {
+                command = new Command_1.Command(this.logger, this.source, this.logQueryText);
+                this.commands.push(command);
+            }
+            result = command.add(query);
+            ;
+        }
+        return result;
+    }
     releaseClient(error) {
-        this.state = 4 /* closed */;
+        this.state = 5 /* closed */;
         if (this.client) {
             this.client.release(error);
             this.client = undefined;

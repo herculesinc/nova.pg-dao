@@ -74,8 +74,6 @@ export class Command implements IQuery {
         return result.promise;
     }
 
-    // QUERY METHODS
-    // --------------------------------------------------------------------------------------------
     submit(connection: Connection) {
         if (!this.text) {
             throw new QueryError('Cannot submit a command: query text is missing');
@@ -93,6 +91,21 @@ export class Command implements IQuery {
         }
     }
 
+    abort(error: Error) {
+        if (this.start) {
+            throw new QueryError('Cannot abort a command: execution already started');
+        }
+
+        const ts = Date.now();
+        for (let i = 0; i < this.results.length; i++) {
+            const command = buildTraceCommand(this.queries[i], this.logQueryText);
+            this.logger.trace(this.source, command, ts - this.start!, false);
+            this.results[i].end(error);
+        }
+    }
+
+    // MESSAGE HANDLERS
+    // --------------------------------------------------------------------------------------------
     handleRowDescription(message: RowDescription) {
         if (this.canceledDueToError) return;
         if (this.cursor >= this.results.length) {
