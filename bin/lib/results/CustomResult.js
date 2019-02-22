@@ -1,5 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+// IMPORTS
+// ================================================================================================
+const pg_1 = require("pg");
+// MODULE VARIABLES
+// ================================================================================================
+const getTypeParser = pg_1.types.getTypeParser;
 ;
 // CLASS DEFINITION
 // ================================================================================================
@@ -8,6 +14,7 @@ class CustomResult {
     // --------------------------------------------------------------------------------------------
     constructor(mask, handler) {
         this.rows = [];
+        this.fields = [];
         this.handler = handler;
         this.complete = false;
         this.rowsToParse = (mask === 'single') ? 1 /* one */ : 2 /* many */;
@@ -24,7 +31,14 @@ class CustomResult {
     // PUBLIC METHODS
     // --------------------------------------------------------------------------------------------
     addFields(fieldDescriptions) {
-        // do nothing
+        for (let i = 0; i < fieldDescriptions.length; i++) {
+            let desc = fieldDescriptions[i];
+            this.fields.push({
+                name: desc.name,
+                oid: desc.dataTypeID,
+                parser: getTypeParser(desc.dataTypeID, desc.format || 'text')
+            });
+        }
     }
     addRow(rowData) {
         // no need to parse more than 1 row for 'single' query mask
@@ -36,7 +50,7 @@ class CustomResult {
                 return;
             }
         }
-        const row = this.handler.parse(rowData);
+        const row = this.handler.parse(rowData, this.fields);
         this.rows.push(row);
     }
     applyCommandComplete(command) {

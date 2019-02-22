@@ -14,7 +14,7 @@ export interface Result {
     readonly isComplete : boolean;
 
     addFields(fieldDescriptions: FieldDescription[]): void;
-    addRow(rowData: any[]): void;
+    addRow(rowData: string[]): void;
     applyCommandComplete(command: CommandComplete): void;
 
     end(error?: Error): void;

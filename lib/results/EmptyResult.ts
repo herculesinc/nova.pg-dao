@@ -40,7 +40,7 @@ export class EmptyResult implements Result {
         // do nothing
     }
 
-    addRow(rowData: any[]): void {
+    addRow(rowData: string[]): void {
         // do nothing
     }
 

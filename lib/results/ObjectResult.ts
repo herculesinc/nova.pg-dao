@@ -1,7 +1,7 @@
 // IMPORTS
 // ================================================================================================
 import { types } from 'pg';
-import { QueryMask } from '@nova/pg-dao';
+import { QueryMask, FieldParser } from '@nova/pg-dao';
 import { Result, FieldDescription, CommandComplete } from './index';
 
 // MODULE VARIABLES
@@ -10,7 +10,6 @@ const getTypeParser = types.getTypeParser;
 
 // INTERFACES
 // ================================================================================================
-type FieldParser = (value: string) => any;
 const enum RowsToParse {
     zero = 0, one = 1, many = 2
 };
@@ -61,7 +60,7 @@ export class ObjectResult implements Result {
         }
     }
 
-    addRow(rowData: any[])  {
+    addRow(rowData: string[])  {
         // no need to parse more than 1 row for 'single' query mask
         if (this.rowsToParse < RowsToParse.many) {
             if (this.rowsToParse === RowsToParse.one) {

@@ -1,24 +1,29 @@
 // IMPORTS
 // ================================================================================================
-import { Dao, Query, SessionOptions, Logger, TraceSource, TraceCommand } from '@nova/pg-dao';
-import { Pool, Client, QueryConfig, QueryResult } from 'pg';
-import { ConnectionError, QueryError, ParseError } from './errors';
+import { Dao, Query, SessionOptions, Logger, TraceSource } from '@nova/pg-dao';
+import { Client } from 'pg';
+import { ConnectionError } from './errors';
+import { Command } from './Command';
 
 // INTERFACES AND ENUMS
 // ================================================================================================
 const enum DaoState {
     pending = 1, active, closing, closed
+};
+
+interface SessionFactory {
+    connect(): Promise<Client>;
 }
 
 // CLASS DEFINITION
 // ================================================================================================
 export class DaoSession implements Dao {
 
-    private readonly pool       : Pool;
-    private readonly source     : TraceSource;
+    private readonly db             : SessionFactory;
+    private readonly source         : TraceSource;
 
-    private state               : DaoState;
-    private client?             : Client;
+    private state                   : DaoState;
+    private client?                 : Client;
 
     private readonly logger         : Logger;
     private readonly readonly       : boolean;
@@ -26,9 +31,9 @@ export class DaoSession implements Dao {
 
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(pool: Pool, options: SessionOptions, source: TraceSource, logger: Logger) {
+    constructor(db: SessionFactory, options: SessionOptions, source: TraceSource, logger: Logger) {
 
-        this.pool = pool;
+        this.db = db;
         this.source = source;
 
         this.readonly = options.readonly;
@@ -69,16 +74,18 @@ export class DaoSession implements Dao {
         }
 
         let closeError: Error | undefined;
-        this.state = DaoState.closing;
         try {
+            let closePromise: Promise<any>;
             if (action === 'commit') {
                 this.logger.debug('Committing and closing session');
-                await this.client!.query(COMMIT_TRANSACTION.text);
+                closePromise = this.execute(COMMIT_TRANSACTION);
             }
             else if (action === 'rollback') {
                 this.logger.debug('Committing and closing session');
-                await this.client!.query(ROLLBACK_TRANSACTION.text);
+                closePromise = this.execute(ROLLBACK_TRANSACTION);
             }
+            this.state = DaoState.closing;
+            await closePromise!;
         }
         catch (error) {
             closeError = new ConnectionError(`Cannot close session`, error);
@@ -95,66 +102,34 @@ export class DaoSession implements Dao {
             throw new ConnectionError('Cannot execute a query: session is closed');
         }
 
-        const start = Date.now();
+        // create a command
+        const command = new Command(this.logger, this.source, this.logQueryText);
 
         // connect to the database and start a transaction
         if (!this.inTransaction) {
-            this.logger.debug('Connecting to the database');
-            this.client = await this.pool.connect();
+            const start = Date.now();
+            try {
+                this.logger.debug('Connecting to the database');
+                this.client = await this.db.connect();
+                this.logger.trace(this.source, 'connect', Date.now() - start, true);
+            }
+            catch(error) {
+                this.logger.trace(this.source, 'connect', Date.now() - start, false);
+                throw new ConnectionError('Cannot execute a query: database connection failed', error);
+            }
 
-            if (this.readonly) {
-                this.logger.debug('Starting transaction in read-only mode');
-                await this.client.query(BEGIN_RO_TRANSACTION.text);
-            }
-            else {
-                this.logger.debug('Starting transaction in read-write mode');
-                await this.client.query(BEGIN_RW_TRANSACTION.text);
-            }
+            const txStartQuery = this.readonly ? BEGIN_RO_TRANSACTION : BEGIN_RW_TRANSACTION;
+            command.add(txStartQuery).catch((error) => {
+                // TODO: log error?
+            });
             this.state = DaoState.active;
         }
 
-        const command: TraceCommand = {
-            name    : query.name || 'unnamed',
-            text    : this.logQueryText ? query.text : undefined
-        };
-
         // execute query
-        let result: QueryResult;
-        try {
-            const pgQuery = toPgQuery(query);
-            result = await this.client!.query(pgQuery);
-        }
-        catch (error) {
-            this.logger.trace(this.source, command, Date.now() - start, false);
-            throw new QueryError(`Failed to execute '${query.name}' query`, error);
-        }
-
-        // process result
-        let rows: any[] = [];
-        if (result && query.handler) {
-            try {
-                for (let row of result.rows) {
-                    rows.push(query.handler.parse(row));
-                }
-            }
-            catch (error) {
-                throw new ParseError(`Failed to parse results for '${query.name}' query`, error);
-            }
-        }
-        else {
-            rows = result.rows;
-        }
-
-        // log query execution
-        this.logger.trace(this.source, command, Date.now() - start, true);
-
-        // return the result
-        if (query.mask === 'single') {
-            return rows[0];
-        }
-        else if (query.mask === 'list') {
-            return rows;
-        }
+        const result = command.add(query);
+        this.client!.query(command as any);
+        
+        return result;
     }
 
     // PRIVATE METHODS
@@ -172,25 +147,15 @@ export class DaoSession implements Dao {
     }
 }
 
-// HELPER FUNCTIONS
-// ================================================================================================
-function toPgQuery(query: Query): QueryConfig {
-    return {
-        text    : query.text,
-        values  : query.values && query.values.length > 0 ? query.values : undefined,
-        rowMode : query.mode === 'array' ? 'array' : undefined
-    };
-}
-
 // TRANSACTION QUERIES
 // ================================================================================================
 const BEGIN_RO_TRANSACTION: Query = {
-    name: 'qBeginTransaction',
+    name: 'qBeginReadOnlyTransaction',
     text: 'BEGIN READ ONLY;'
 };
 
 const BEGIN_RW_TRANSACTION: Query = {
-    name: 'qBeginTransaction',
+    name: 'qBeginReadWriteTransaction',
     text: 'BEGIN READ WRITE;'
 };
 

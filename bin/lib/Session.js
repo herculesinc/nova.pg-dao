@@ -1,13 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const errors_1 = require("./errors");
+const Command_1 = require("./Command");
+;
 // CLASS DEFINITION
 // ================================================================================================
 class DaoSession {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(pool, options, source, logger) {
-        this.pool = pool;
+    constructor(db, options, source, logger) {
+        this.db = db;
         this.source = source;
         this.readonly = options.readonly;
         this.logQueryText = options.logQueryText;
@@ -40,16 +42,18 @@ class DaoSession {
             return;
         }
         let closeError;
-        this.state = 3 /* closing */;
         try {
+            let closePromise;
             if (action === 'commit') {
                 this.logger.debug('Committing and closing session');
-                await this.client.query(COMMIT_TRANSACTION.text);
+                closePromise = this.execute(COMMIT_TRANSACTION);
             }
             else if (action === 'rollback') {
                 this.logger.debug('Committing and closing session');
-                await this.client.query(ROLLBACK_TRANSACTION.text);
+                closePromise = this.execute(ROLLBACK_TRANSACTION);
             }
+            this.state = 3 /* closing */;
+            await closePromise;
         }
         catch (error) {
             closeError = new errors_1.ConnectionError(`Cannot close session`, error);
@@ -64,59 +68,30 @@ class DaoSession {
         if (!this.isActive) {
             throw new errors_1.ConnectionError('Cannot execute a query: session is closed');
         }
-        const start = Date.now();
+        // create a command
+        const command = new Command_1.Command(this.logger, this.source, this.logQueryText);
         // connect to the database and start a transaction
         if (!this.inTransaction) {
-            this.logger.debug('Connecting to the database');
-            this.client = await this.pool.connect();
-            if (this.readonly) {
-                this.logger.debug('Starting transaction in read-only mode');
-                await this.client.query(BEGIN_RO_TRANSACTION.text);
-            }
-            else {
-                this.logger.debug('Starting transaction in read-write mode');
-                await this.client.query(BEGIN_RW_TRANSACTION.text);
-            }
-            this.state = 2 /* active */;
-        }
-        const command = {
-            name: query.name || 'unnamed',
-            text: this.logQueryText ? query.text : undefined
-        };
-        // execute query
-        let result;
-        try {
-            const pgQuery = toPgQuery(query);
-            result = await this.client.query(pgQuery);
-        }
-        catch (error) {
-            this.logger.trace(this.source, command, Date.now() - start, false);
-            throw new errors_1.QueryError(`Failed to execute '${query.name}' query`, error);
-        }
-        // process result
-        let rows = [];
-        if (result && query.handler) {
+            const start = Date.now();
             try {
-                for (let row of result.rows) {
-                    rows.push(query.handler.parse(row));
-                }
+                this.logger.debug('Connecting to the database');
+                this.client = await this.db.connect();
+                this.logger.trace(this.source, 'connect', Date.now() - start, true);
             }
             catch (error) {
-                throw new errors_1.ParseError(`Failed to parse results for '${query.name}' query`, error);
+                this.logger.trace(this.source, 'connect', Date.now() - start, false);
+                throw new errors_1.ConnectionError('Cannot execute a query: database connection failed', error);
             }
+            const txStartQuery = this.readonly ? BEGIN_RO_TRANSACTION : BEGIN_RW_TRANSACTION;
+            command.add(txStartQuery).catch((error) => {
+                // TODO: log error?
+            });
+            this.state = 2 /* active */;
         }
-        else {
-            rows = result.rows;
-        }
-        // log query execution
-        this.logger.trace(this.source, command, Date.now() - start, true);
-        // return the result
-        if (query.mask === 'single') {
-            return rows[0];
-        }
-        else if (query.mask === 'list') {
-            return rows;
-        }
+        // execute query
+        const result = command.add(query);
+        this.client.query(command);
+        return result;
     }
     // PRIVATE METHODS
     // --------------------------------------------------------------------------------------------
@@ -133,23 +108,14 @@ class DaoSession {
     }
 }
 exports.DaoSession = DaoSession;
-// HELPER FUNCTIONS
-// ================================================================================================
-function toPgQuery(query) {
-    return {
-        text: query.text,
-        values: query.values && query.values.length > 0 ? query.values : undefined,
-        rowMode: query.mode === 'array' ? 'array' : undefined
-    };
-}
 // TRANSACTION QUERIES
 // ================================================================================================
 const BEGIN_RO_TRANSACTION = {
-    name: 'qBeginTransaction',
+    name: 'qBeginReadOnlyTransaction',
     text: 'BEGIN READ ONLY;'
 };
 const BEGIN_RW_TRANSACTION = {
-    name: 'qBeginTransaction',
+    name: 'qBeginReadWriteTransaction',
     text: 'BEGIN READ WRITE;'
 };
 const COMMIT_TRANSACTION = {

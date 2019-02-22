@@ -55,19 +55,33 @@ declare module "@nova/pg-dao" {
 
     // DAO
     // --------------------------------------------------------------------------------------------
-    export interface DaoSession extends Dao {
+    export interface DaoSession {
 
         readonly inTransaction  : boolean;
+        readonly isActive       : boolean;
+        readonly isReadOnly     : boolean;
         
         execute<T>(query: SingleResultQuery<T>) : Promise<T>;
         execute<T>(query: ListResultQuery<T>)   : Promise<T[]>;
         execute(query: Query<void>)             : Promise<void>;
+
+        close(action: 'commit' | 'rollback'): Promise<any>;
     }
 
     // RESULT HANDLER
     // --------------------------------------------------------------------------------------------
     export interface ResultHandler<T=any> {
-        parse(row: any): T;
+        parse(rowData: string[], fields?: FieldDescriptor[]): T;
+    }
+
+    export interface FieldParser {
+        (value: string): any;
+    }
+
+    export interface FieldDescriptor {
+        readonly name       : string;
+        readonly oid        : number;
+        readonly parser     : FieldParser;
     }
 
     // QUERY
