@@ -1,5 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+// IDENTIFIERS
+// ================================================================================================
+function generateTimeId() {
+    const time = process.hrtime();
+    return time[0].toString(16) + time[1].toString(16);
+}
+exports.generateTimeId = generateTimeId;
 // PARAMETER PREPARATION
 // ================================================================================================
 function prepareValue(value) {

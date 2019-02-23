@@ -1,14 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-// MODULE VARIABLES
-// ================================================================================================
-const matchRegexp = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/;
 // CLASS DEFINITION
 // ================================================================================================
 class EmptyResult {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     constructor() {
+        this.rowCount = 0;
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
             this.reject = reject;
@@ -27,18 +25,9 @@ class EmptyResult {
     addRow(rowData) {
         // do nothing
     }
-    applyCommandComplete(command) {
-        const match = matchRegexp.exec(command.text);
-        if (match) {
-            this.command = match[1];
-            if (match[3]) {
-                this.oid = Number.parseInt(match[2], 10);
-                this.rowCount = Number.parseInt(match[3], 10);
-            }
-            else if (match[2]) {
-                this.rowCount = Number.parseInt(match[2], 10);
-            }
-        }
+    complete(command, rows) {
+        this.command = command;
+        this.rowCount = rows;
     }
     end(error) {
         if (error)

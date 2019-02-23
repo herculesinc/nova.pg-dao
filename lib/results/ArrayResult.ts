@@ -2,7 +2,7 @@
 // ================================================================================================
 import { types } from 'pg';
 import { QueryMask, FieldParser } from '@nova/pg-dao';
-import { Result, FieldDescription, CommandComplete } from './index';
+import { Result, FieldDescription } from './index';
 
 // MODULE VARIABLES
 // ================================================================================================
@@ -18,13 +18,12 @@ const enum RowsToParse {
 // ================================================================================================
 export class ArrayResult implements Result {
 
-    readonly rows   : any[];
+    command?            : string;
+    readonly rows       : any[];
+    readonly promise    : Promise<any>;
+    readonly fields     : FieldDescription[];
+    readonly parsers    : FieldParser[];
 
-    readonly promise: Promise<any>;
-    readonly fields : FieldDescription[];
-    readonly parsers: FieldParser[];
-
-    private complete    : boolean;
     private rowsToParse : RowsToParse;
     private resolve?    : (result?: any) => void;
     private reject?     : (error: Error) => void;
@@ -35,7 +34,6 @@ export class ArrayResult implements Result {
         this.rows = [];
         this.fields = [];
         this.parsers = [];
-        this.complete = false;
         this.rowsToParse = (mask === 'single') ? RowsToParse.one : RowsToParse.many;
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
@@ -46,7 +44,11 @@ export class ArrayResult implements Result {
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
     get isComplete(): boolean {
-        return this.complete;
+        return (this.command !== undefined);
+    }
+
+    get rowCount(): number {
+        return this.rows.length;
     }
 
     // PUBLIC METHODS
@@ -83,8 +85,8 @@ export class ArrayResult implements Result {
         this.rows.push(row);
     }
 
-    applyCommandComplete(command: CommandComplete) {
-        this.complete = true;
+    complete(command: string, rows: number) {
+        this.command = command;
     }
 
     end(error?: Error) {

@@ -10,12 +10,14 @@ import { EmptyResult } from './EmptyResult';
 // ================================================================================================
 export interface Result {
 
+    readonly command?   : string;
+    readonly rowCount   : number;
     readonly promise    : Promise<any>;
     readonly isComplete : boolean;
 
     addFields(fieldDescriptions: FieldDescription[]): void;
     addRow(rowData: string[]): void;
-    applyCommandComplete(command: CommandComplete): void;
+    complete(command: string, rows: number): void;
 
     end(error?: Error): void;
 }
@@ -28,12 +30,6 @@ export interface FieldDescription {
     dataTypeSize    : number;
     dataTypeModifier: number;
     format          : string;
-}
-
-export interface CommandComplete {
-    name            : 'commandComplete';
-    length          : number;
-    text            : string;
 }
 
 interface ResultOptions {

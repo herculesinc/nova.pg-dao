@@ -1,3 +1,10 @@
+// IDENTIFIERS
+// ================================================================================================
+export function generateTimeId(): string {
+    const time = process.hrtime();
+    return time[0].toString(16) + time[1].toString(16);
+}
+
 // PARAMETER PREPARATION
 // ================================================================================================
 export function prepareValue(value: any) {

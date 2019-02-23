@@ -26,7 +26,8 @@ const singleQueryOptions: SingleResultQueryOptions<string> = {
 };
 
 const IdHandler: ResultHandler<string> = {
-    parse(rowData: string[]) {
+    
+    parse(rowData) {
         return rowData[0];
     }
 }
@@ -94,7 +95,7 @@ const database = new Database({
     const query2 = Query.from('SELECT status FROM tokens LIMIT 5;', 'query2', { mask: 'list' })
     const result2 = session.execute(query2);
 
-    const template1 = Query.template('SELECT id, status, handle FROM accounts WHERE profile = {{profile}} LIMIT 5', { mask: 'single', handler: IdHandler });
+    const template1 = Query.template('SELECT id, status, handle FROM accounts WHERE profile = {{profile}};', 'query3', 'single');
     const query3 = new template1({ profile: `test's` });
     const result3 = session.execute(query3);
 

@@ -16,7 +16,6 @@ class ObjectResult {
         this.rows = [];
         this.fields = [];
         this.parsers = [];
-        this.complete = false;
         this.rowsToParse = (mask === 'single') ? 1 /* one */ : 2 /* many */;
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
@@ -26,7 +25,10 @@ class ObjectResult {
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
     get isComplete() {
-        return this.complete;
+        return (this.command !== undefined);
+    }
+    get rowCount() {
+        return this.rows.length;
     }
     // PUBLIC METHODS
     // --------------------------------------------------------------------------------------------
@@ -61,8 +63,8 @@ class ObjectResult {
         }
         this.rows.push(row);
     }
-    applyCommandComplete(command) {
-        this.complete = true;
+    complete(command, rows) {
+        this.command = command;
     }
     end(error) {
         if (error)

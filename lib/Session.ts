@@ -99,7 +99,6 @@ export class DaoSession implements Dao {
 
     // EXECUTE METHOD
     // --------------------------------------------------------------------------------------------
-    
     async execute<T>(query: ListResultQuery<T>): Promise<T[]>
     async execute<T>(query: SingleResultQuery<T>): Promise<T | undefined>
     async execute(query: Query<void>): Promise<void>

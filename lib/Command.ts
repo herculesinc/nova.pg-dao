@@ -4,12 +4,17 @@ import { Logger, TraceSource, TraceCommand } from '@nova/core';
 import { Result, createResult } from './results';
 import { Query } from './Query';
 import { QueryError, ParseError } from './errors';
-import { prepareValue } from './util';
+import * as util from './util';
+
+// MODULE VARIABLES
+// ================================================================================================
+const COMMAND_COMPLETE_REGEX = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/;
 
 // CLASS DEFINITION
 // ================================================================================================
 export class Command implements IQuery {
 
+    private readonly id             : string;
     private readonly source         : TraceSource;
     private readonly logger         : Logger;
     private readonly logQueryText   : boolean;
@@ -28,8 +33,9 @@ export class Command implements IQuery {
     // --------------------------------------------------------------------------------------------
     constructor(logger: Logger, source: TraceSource, logQueryText: boolean) {
 
-        this.logger = logger;
+        this.id = util.generateTimeId();
         this.source = source;
+        this.logger = logger;
         this.logQueryText = logQueryText;
 
         this.text = '';
@@ -62,7 +68,7 @@ export class Command implements IQuery {
 
             this.values = [];
             for (let value of query.values) {
-                this.values.push(prepareValue(value));
+                this.values.push(util.prepareValue(value));
             }
         }
         else if (query.values !== undefined) {
@@ -98,8 +104,7 @@ export class Command implements IQuery {
 
         const ts = Date.now();
         for (let i = 0; i < this.results.length; i++) {
-            const command = buildTraceCommand(this.queries[i], this.logQueryText);
-            this.logger.trace(this.source, command, ts - this.start!, false);
+            this.logResultTrace(this.queries[i], this.results[i], false, ts);
             this.results[i].end(error);
         }
     }
@@ -127,7 +132,8 @@ export class Command implements IQuery {
     }
 
     handleCommandComplete(message: CommandComplete, connection: Connection) {
-        this.results[this.cursor].applyCommandComplete(message);
+        const parsed = parseCommandComplete(message);
+        this.results[this.cursor].complete(parsed.command, parsed.rows);
         this.cursor++;
         
         if (this.isParameterized) {
@@ -143,8 +149,7 @@ export class Command implements IQuery {
 
         const ts = Date.now();
         for (let i = 0; i < this.results.length; i++) {
-            const command = buildTraceCommand(this.queries[i], this.logQueryText);
-            this.logger.trace(this.source, command, ts - this.start!, true);
+            this.logResultTrace(this.queries[i], this.results[i], true, ts);
             this.results[i].end();
         }
     }
@@ -167,8 +172,7 @@ export class Command implements IQuery {
         
         const ts = Date.now();
         for (let i = 0; i < this.results.length; i++) {
-            const command = buildTraceCommand(this.queries[i], this.logQueryText);
-            this.logger.trace(this.source, command, ts - this.start!, false);
+            this.logResultTrace(this.queries[i], this.results[i], false, ts);
             this.results[i].end(error);
         }
     }
@@ -184,17 +188,26 @@ export class Command implements IQuery {
     handleCopyData(message: any, connection: Connection) {
         throw new QueryError('Handling of copyData messages is not supported');
     }
+
+    // PRIVATE METHODS
+    // --------------------------------------------------------------------------------------------
+    private logResultTrace(query: Query, result: Result, success: boolean, endTs: number) {
+        const command: TraceCommand = {
+            name    : query.name || 'unnamed',
+            text    : this.logQueryText ? query.text : result.command
+        };
+
+        const details = {
+            commandId   : this.id,
+            rowCount    : result.rowCount + ''
+        };
+
+        this.logger.trace(this.source, command, endTs - this.start!, success, details);
+    }
 }
 
 // HELPER FUNCTIONS
 // ================================================================================================
-function buildTraceCommand(query: Query, logQueryText: boolean): TraceCommand {
-    return {
-        name    : query.name || 'unnamed',
-        text    : logQueryText ? query.text : undefined
-    };
-}
-
 function validateQueryText(text: string) {
     if (typeof text !== 'string') throw new TypeError('Query text must be a string');
     text = text.trim();
@@ -203,6 +216,29 @@ function validateQueryText(text: string) {
         text = text + ';';
     }
     return text;
+}
+
+function parseCommandComplete(message: CommandComplete) {
+    let command: string, rows: number;
+
+    const match = COMMAND_COMPLETE_REGEX.exec(message.text);
+    if (match) {
+        command = match[1];
+        if (match[3]) {
+            rows = Number.parseInt(match[3], 10);
+        } else if (match[2]) {
+            rows = Number.parseInt(match[2], 10);
+        }
+        else {
+            rows = 0;
+        }
+    }
+    else {
+        command = 'UNKNOWN';
+        rows = 0;
+    }
+
+    return { command, rows };
 }
 
 // PG INTERFACES

@@ -2,7 +2,7 @@
 // ================================================================================================
 import { types } from 'pg';
 import { QueryMask, ResultHandler, FieldDescriptor } from '@nova/pg-dao';
-import { Result, FieldDescription, CommandComplete } from './index';
+import { Result, FieldDescription } from './index';
 
 // MODULE VARIABLES
 // ================================================================================================
@@ -18,12 +18,12 @@ const enum RowsToParse {
 // ================================================================================================
 export class CustomResult implements Result {
 
-    readonly rows   : any[];
-    readonly fields : FieldDescriptor[];
-    readonly promise: Promise<any>;
-    readonly handler: ResultHandler;
+    command?            : string;
+    readonly rows       : any[];
+    readonly fields     : FieldDescriptor[];
+    readonly promise    : Promise<any>;
+    readonly handler    : ResultHandler;
 
-    private complete    : boolean;
     private rowsToParse : RowsToParse;
     private resolve?    : (result?: any) => void;
     private reject?     : (error: Error) => void;
@@ -34,7 +34,6 @@ export class CustomResult implements Result {
         this.rows = [];
         this.fields = [];
         this.handler = handler;
-        this.complete = false;
         this.rowsToParse = (mask === 'single') ? RowsToParse.one : RowsToParse.many;
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
@@ -45,7 +44,11 @@ export class CustomResult implements Result {
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
     get isComplete(): boolean {
-        return this.complete;
+        return (this.command !== undefined);
+    }
+
+    get rowCount(): number {
+        return this.rows.length;
     }
 
     // PUBLIC METHODS
@@ -76,8 +79,8 @@ export class CustomResult implements Result {
         this.rows.push(row);
     }
 
-    applyCommandComplete(command: CommandComplete) {
-        this.complete = true;
+    complete(command: string, rows: number) {
+        this.command = command;
     }
 
     end(error?: Error) {
