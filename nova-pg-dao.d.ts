@@ -5,7 +5,7 @@ declare module "@nova/pg-dao" {
     import { EventEmitter } from 'events';
 
     import { Dao, Logger, TraceSource, Exception } from '@nova/core';
-    export { Dao, Logger, TraceSource, TraceCommand } from '@nova/core';
+    export { Logger, TraceSource, TraceCommand } from '@nova/core';
 
     // DATABASE
     // --------------------------------------------------------------------------------------------
@@ -126,7 +126,7 @@ declare module "@nova/pg-dao" {
         readonly mask       : 'single';
     }
     
-    export interface ListResultQuery<T> extends ResultQuery<T> {
+    export interface ListResultQuery<T=any> extends ResultQuery<T> {
         readonly mask       : 'list';
     }
     
@@ -150,6 +150,91 @@ declare module "@nova/pg-dao" {
         new(params: object): T;
     }
 
+    // DATABASE SCHEMA
+    // --------------------------------------------------------------------------------------------
+    export type Timestamp = number;
+    export namespace Timestamp {
+        export function parse(value: any): Timestamp | undefined;
+    }
+
+    export type DbFieldType = typeof Number | typeof String | typeof Boolean | typeof Timestamp | typeof Date | typeof Object | typeof Array;
+
+    export type Parser<T=any> = (value: string) => T;
+    export type Serializer = (value: any) => string;
+    export type Cloner<T=any> = (value: T) => T;
+    export type Comparator = (value1: any, value2: any) => boolean;
+
+    export interface FieldHandler {
+        parse?      : Parser;
+        serialize?  : Serializer;
+        clone       : Cloner;
+        areEqual    : Comparator;
+    }
+
+    export interface DbField {
+        readonly name		: string;
+        readonly snakeName	: string;
+        readonly type		: DbFieldType;
+        readonly readonly	: boolean;
+        readonly areEqual?	: Comparator;
+        readonly clone?		: Cloner;
+        readonly parse?     : Parser;
+        readonly serialize? : Serializer;
+    }
+
+    export interface DbFieldConfig {
+        type		: DbFieldType;
+        readonly?	: boolean;
+        handler?	: FieldHandler;
+    }
+
+    export interface FieldMap {
+        [fieldName: string]: DbFieldConfig;
+    }
+
+    export interface DbSchema {
+        readonly name           : string;
+        readonly table          : string;
+        readonly idGenerator	: IdGenerator;
+        readonly fields		    : ReadonlyArray<DbField>;
+
+        readonly selectSql      : string;
+
+        hasField(fieldName: string) : boolean;
+        getField(fieldNam: string)  : DbField | undefined;
+    }
+
+    export interface IdGenerator {
+        getNextId(dao?: DaoSession): Promise<string>;
+    }
+
+    // MODELS
+    // --------------------------------------------------------------------------------------------
+    export class Model {
+
+        constructor(seed: object, deepCopy?: boolean);
+        constructor(rowData: string[], fields: FieldDescriptor[]);
+
+        readonly id         : string;
+        readonly createdOn  : number;
+        readonly updatedOn  : number;
+
+        infuse(rowData: string[], fields: FieldDescriptor[]): void;
+        getSyncQueries(): Query[];
+
+        isMutable(): boolean;
+        isCreated(): boolean;
+        isDeleted(): boolean;
+
+        static parse<T extends typeof Model>(this: T, rowData: string[], fields: FieldDescriptor[]): InstanceType<T>;
+
+        static getFetchAllQuery<T extends typeof Model>(selector: any, forUpdate: boolean): ListResultQuery<InstanceType<T>>;
+        static getFetchOneQuery<T extends typeof Model>(this: T, selector: any, forUpdate: boolean): SingleResultQuery<InstanceType<T>>;
+
+        static setSchema(table: string, idGenerator: IdGenerator, fields: FieldMap): DbSchema;
+        static getSchema(): DbSchema;
+    }
+
     // ERROR CLASSES
     // --------------------------------------------------------------------------------------------
     export class ConnectionError extends Exception {
@@ -163,6 +248,11 @@ declare module "@nova/pg-dao" {
     }
 
     export class ParseError extends Exception {
+        constructor(cause: Error);
+	    constructor(message: string, cause?: Error);
+    }
+
+    export class ModelError extends Exception {
         constructor(cause: Error);
 	    constructor(message: string, cause?: Error);
     }

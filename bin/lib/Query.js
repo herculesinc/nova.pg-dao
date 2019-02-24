@@ -145,6 +145,7 @@ function stringifySingleParam(value, values) {
         }
     }
 }
+exports.stringifySingleParam = stringifySingleParam;
 function stringifyRawArrayParam(array, values) {
     if (array === undefined || array === null || array.length === 0)
         return 'null';
@@ -198,6 +199,7 @@ function stringifyArrayParam(array, values) {
     }
     return paramValues.join(',');
 }
+exports.stringifyArrayParam = stringifyArrayParam;
 // VALIDATORS
 // ================================================================================================
 function validateQueryArguments(text, nameOrOptions, maskOrOptions) {

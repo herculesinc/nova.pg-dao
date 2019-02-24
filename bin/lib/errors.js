@@ -38,4 +38,15 @@ class ParseError extends core_1.Exception {
     }
 }
 exports.ParseError = ParseError;
+class ModelError extends core_1.Exception {
+    constructor(messageOrCause, cause) {
+        if (typeof messageOrCause === 'string') {
+            super({ name: 'Model Error', message: messageOrCause, cause });
+        }
+        else {
+            super({ name: 'Model Error', cause: messageOrCause });
+        }
+    }
+}
+exports.ModelError = ModelError;
 //# sourceMappingURL=errors.js.map

@@ -159,7 +159,7 @@ function stringifyRawSingleParam(value: any, values: string[]) {
     }
 }
 
-function stringifySingleParam(value: any, values: string[]): string {
+export function stringifySingleParam(value: any, values: string[]): string {
     if (value === undefined || value === null) return 'null';
 
     switch (typeof value) {
@@ -223,7 +223,7 @@ function stringifyRawArrayParam(array: any[], values: string[]): string {
     return paramValues.join(',');
 }
 
-function stringifyArrayParam(array: any[], values: string[]): string {
+export function stringifyArrayParam(array: any[], values: string[]): string {
     if (array === undefined || array === null || array.length === 0) return 'null';
     if (!Array.isArray(array)) throw new Error('Query parameter must be an array');
 

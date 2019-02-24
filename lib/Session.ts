@@ -1,6 +1,7 @@
 // IMPORTS
 // ================================================================================================
-import { Dao, Query, SingleResultQuery, ListResultQuery, SessionOptions, Logger, TraceSource } from '@nova/pg-dao';
+import { Dao } from '@nova/core';
+import { Query, SingleResultQuery, ListResultQuery, SessionOptions, Logger, TraceSource } from '@nova/pg-dao';
 import { Client } from 'pg';
 import { ConnectionError } from './errors';
 import { Command } from './Command';
