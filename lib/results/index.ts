@@ -1,9 +1,12 @@
 // IMPORTS
 // ================================================================================================
 import { QueryMask, QueryHandler, ResultHandler } from '@nova/pg-dao';
+import { isModelClass } from '../Model';
+import { Store } from '../Store';
 import { ArrayResult } from './ArrayResult';
 import { ObjectResult } from './ObjectResult';
 import { CustomResult } from './CustomResult';
+import { ModelResult } from './ModelResult';
 import { EmptyResult } from './EmptyResult';
 
 // INTERFACES
@@ -35,22 +38,27 @@ export interface FieldDescription {
 interface ResultOptions {
     mask?           : QueryMask;
     handler?        : QueryHandler;
+    mutable?        : boolean;
 }
 
 // PUBLIC FUNCTIONS
 // ================================================================================================
-export function createResult(options: ResultOptions): Result {
+export function createResult(options: ResultOptions, store: Store): Result {
 
     if (options.handler) {
         const handler = options.handler;
+        const mask = options.mask || 'list';
         if (handler === Object) {
-            return new ObjectResult(options.mask || 'list');
+            return new ObjectResult(mask);
         }
         else if (handler === Array) {
-            return new ArrayResult(options.mask || 'list');
+            return new ArrayResult(mask);
+        }
+        else if (isModelClass(handler)) {
+            return new ModelResult(mask, options.mutable || false, handler, store);
         }
         else {
-            return new CustomResult(options.mask || 'list', handler as ResultHandler);
+            return new CustomResult(mask, handler as ResultHandler);
         }
     }
     else {

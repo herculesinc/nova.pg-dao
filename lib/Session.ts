@@ -3,8 +3,9 @@
 import { Dao } from '@nova/core';
 import { Query, SingleResultQuery, ListResultQuery, SessionOptions, Logger, TraceSource } from '@nova/pg-dao';
 import { Client } from 'pg';
-import { ConnectionError } from './errors';
 import { Command } from './Command';
+import { Store } from './Store';
+import { ConnectionError } from './errors';
 
 // INTERFACES AND ENUMS
 // ================================================================================================
@@ -27,6 +28,7 @@ export class DaoSession implements Dao {
     private client?                 : Client;
     private commands                : Command[];
 
+    private readonly store          : Store;
     private readonly logger         : Logger;
     private readonly readonly       : boolean;
     private readonly logQueryText   : boolean;
@@ -41,6 +43,7 @@ export class DaoSession implements Dao {
         this.readonly = options.readonly;
         this.logQueryText = options.logQueryText;
         this.logger = logger;
+        this.store = new Store();
 
         this.state = DaoState.pending;
         this.client = undefined;
@@ -164,7 +167,7 @@ export class DaoSession implements Dao {
     // --------------------------------------------------------------------------------------------
     private queueFirstCommand(): Command {
         // create a command and add it to the command queue
-        const command = new Command(this.logger, this.source, this.logQueryText);
+        const command = new Command(this.store, this.logger, this.source, this.logQueryText);
         this.commands.push(command);
 
         // add begin transaction query to the command
@@ -179,7 +182,7 @@ export class DaoSession implements Dao {
         let result: any;
         if (query.values) {
             // if parameterized query, it must start a new command
-            const command = new Command(this.logger, this.source, this.logQueryText);
+            const command = new Command(this.store, this.logger, this.source, this.logQueryText);
             this.commands.push(command);
             result = command.add(query);;
         }
@@ -190,7 +193,7 @@ export class DaoSession implements Dao {
             // try to append the query to the last command in the queue
             let command = this.commands[this.commands.length - 1];
             if (!command || command.isParameterized) {
-                command = new Command(this.logger, this.source, this.logQueryText);
+                command = new Command(this.store, this.logger, this.source, this.logQueryText);
                 this.commands.push(command);
             }
             result = command.add(query);;

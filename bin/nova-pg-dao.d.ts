@@ -87,7 +87,7 @@ declare module "@nova/pg-dao" {
     // QUERY
     // --------------------------------------------------------------------------------------------
     export type QueryMask = 'list' | 'single';
-    export type QueryHandler<T=any> = typeof Object | typeof Array | ResultHandler<T>;
+    export type QueryHandler<T=any> = typeof Object | typeof Array | typeof Model | ResultHandler<T>;
 
     export interface Query<T=any> {
         readonly text       : string;
@@ -198,8 +198,6 @@ declare module "@nova/pg-dao" {
         readonly idGenerator	: IdGenerator;
         readonly fields		    : ReadonlyArray<DbField>;
 
-        readonly selectSql      : string;
-
         hasField(fieldName: string) : boolean;
         getField(fieldNam: string)  : DbField | undefined;
     }
@@ -225,8 +223,7 @@ declare module "@nova/pg-dao" {
         isMutable(): boolean;
         isCreated(): boolean;
         isDeleted(): boolean;
-
-        static parse<T extends typeof Model>(this: T, rowData: string[], fields: FieldDescriptor[]): InstanceType<T>;
+        isModified(): boolean;
 
         static getFetchAllQuery<T extends typeof Model>(selector: any, forUpdate: boolean): ListResultQuery<InstanceType<T>>;
         static getFetchOneQuery<T extends typeof Model>(this: T, selector: any, forUpdate: boolean): SingleResultQuery<InstanceType<T>>;

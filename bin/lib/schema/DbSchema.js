@@ -62,17 +62,6 @@ class DbSchema {
                 this.customSerializers.set(field.name, field);
             }
         }
-        // build select SQL
-        const fieldGetters = [];
-        for (let field of this.fields) {
-            if (field.name === field.snakeName) {
-                fieldGetters.push(field.name);
-            }
-            else {
-                fieldGetters.push(`${field.snakeName} AS "${field.name}"`);
-            }
-        }
-        this.selectSql = `SELECT ${fieldGetters.join(',')} FROM ${this.table}`;
     }
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------

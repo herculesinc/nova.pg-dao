@@ -1,7 +1,7 @@
 // IMPORTS
 // ================================================================================================
 import {
-    QueryHandler, QueryMask, QueryTemplate, ResultQuery, ResultQueryOptions, ResultHandler,
+    QueryHandler, QueryMask, QueryTemplate, ResultQuery, ResultQueryOptions,
     ListResultQuery, ListResultQueryOptions, SingleResultQuery, SingleResultQueryOptions
 } from '@nova/pg-dao';
 import { QueryError } from './errors';

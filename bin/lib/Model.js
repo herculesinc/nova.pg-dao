@@ -8,6 +8,26 @@ exports.symDeleted = Symbol();
 exports.symCreated = Symbol();
 exports.symMutable = Symbol();
 const symOriginal = Symbol();
+// PUBLIC FUNCTIONS
+// ================================================================================================
+function getModelClass(model) {
+    if (!model)
+        throw new TypeError('Model is undefined');
+    const modelClass = model.constructor;
+    if (modelClass.prototype instanceof Model === false) {
+        throw new TypeError('Model is invalid');
+    }
+    return modelClass;
+}
+exports.getModelClass = getModelClass;
+function isModelClass(modelClass) {
+    if (!modelClass)
+        throw TypeError('Model class is undefined');
+    if (!modelClass.prototype)
+        return false;
+    return modelClass.prototype instanceof Model;
+}
+exports.isModelClass = isModelClass;
 // CLASS DEFINITION
 // ================================================================================================
 class Model {
@@ -15,11 +35,16 @@ class Model {
     // --------------------------------------------------------------------------------------------
     constructor(seed, fields) {
         if (!seed)
-            throw new errors_1.ModelError('Cannot instantiate a model: model seed is undefined');
+            throw new TypeError('Model seed is undefined');
         if (Array.isArray(seed)) {
-            // TODO: this.infuse(seed);
+            if (!fields)
+                throw new TypeError('Models fields are undefined');
+            if (!Array.isArray(fields))
+                throw new TypeError('Model fields are invalid');
+            this.infuse(seed, fields);
         }
         else {
+            // TODO: build model
         }
         // initialize internal state
         this[exports.symMutable] = false;
@@ -31,6 +56,13 @@ class Model {
     static parse(rowData, fields) {
         return new this(rowData, fields);
     }
+    /*
+    static SelectQueryBase<T extends typeof Model>(this: T, mask: 'list'): SelectModelQuery2<InstanceType<T>>
+    static SelectQueryBase<T extends typeof Model>(this: T, mask: 'single'): SelectModelQuery<InstanceType<T>>
+    static SelectQueryBase<T extends typeof Model>(this: T, mask: QueryMask): any {
+        return this.SelectQuery as any;
+    }
+    */
     static getFetchOneQuery(selector, forUpdate) {
         return new this.qFetchOneModel(selector, forUpdate);
     }
@@ -45,39 +77,59 @@ class Model {
         const schema = new schema_1.DbSchema(modelName, tableName, idGenerator, fields);
         this.schema = schema;
         // build query templates
-        this.qFetchAllModels = schema_1.queries.buildSelectQueryTemplate(schema, 'list', this);
-        this.qFetchOneModel = schema_1.queries.buildSelectQueryTemplate(schema, 'single', this);
-        this.qInsertModel = schema_1.queries.buildInsertQueryTemplate(schema);
-        this.qUpdateModel = schema_1.queries.buildUpdateQueryTemplate(schema);
-        this.qDeleteModel = schema_1.queries.buildDeleteQueryTemplate(schema);
+        this.qFetchAllModels = schema_1.queries.buildFetchQueryClass(schema, 'list', this);
+        this.qFetchOneModel = schema_1.queries.buildFetchQueryClass(schema, 'single', this);
+        this.qInsertModel = schema_1.queries.buildInsertQueryClass(schema);
+        this.qUpdateModel = schema_1.queries.buildUpdateQueryClass(schema);
+        this.qDeleteModel = schema_1.queries.buildDeleteQueryClass(schema);
+        // this.SelectQuery = queries.buildSelectQueryClass(schema, this);
     }
     static getSchema() {
         return this.schema;
     }
     // STATE ACCESSORS
     // --------------------------------------------------------------------------------------------
-    isMutable() {
+    get isMutable() {
         return this[exports.symMutable];
     }
-    isCreated() {
+    get isCreated() {
         return this[exports.symCreated];
     }
-    isDeleted() {
+    get isDeleted() {
         return this[exports.symDeleted];
+    }
+    get isModified() {
+        const schema = this.constructor.getSchema();
+        const original = this[symOriginal];
+        for (let field of schema.fields) {
+            if (field.readonly)
+                continue;
+            let fieldName = field.name;
+            if (field.areEqual) {
+                if (!field.areEqual(this[fieldName], original[fieldName]))
+                    return true;
+            }
+            else {
+                if (this[fieldName] !== original[fieldName])
+                    return true;
+            }
+        }
+        return false;
     }
     // MODEL METHODS
     // --------------------------------------------------------------------------------------------
-    infuse(rowData, fields) {
+    infuse(rowData, dbFields) {
         const schema = this.constructor.getSchema();
-        const original = [];
+        const original = {};
         for (let i = 0; i < schema.fields.length; i++) {
             let field = schema.fields[i];
-            let fieldValue = field.parse ? field.parse(rowData[i]) : fields[i].parser(rowData[i]);
-            this[field.name] = fieldValue;
+            let fieldName = field.name;
+            let fieldValue = field.parse ? field.parse(rowData[i]) : dbFields[i].parser(rowData[i]);
+            this[fieldName] = fieldValue;
             // don't keep originals of read-only fields
             if (field.readonly)
                 continue;
-            original[i] = field.clone ? field.clone(fieldValue) : fieldValue;
+            original[fieldName] = field.clone ? field.clone(fieldValue) : fieldValue;
         }
         this[symOriginal] = original;
     }
@@ -115,6 +167,18 @@ class Model {
         }
         return queries;
     }
+    applyChanges() {
+        const schema = this.constructor.getSchema();
+        const original = {};
+        for (let field of schema.fields) {
+            if (field.readonly)
+                continue;
+            let fieldName = field.name;
+            let fieldValue = this[fieldName];
+            original[fieldName] = field.clone ? field.clone(fieldValue) : fieldValue;
+        }
+        this[symOriginal] = original;
+    }
     // PRIVATE METHODS
     // --------------------------------------------------------------------------------------------
     buildInsertQuery() {
@@ -128,6 +192,7 @@ class Model {
                 let fieldValue = this[fieldName];
                 params[fieldName] = field.serialize ? field.serialize(fieldValue) : fieldValue;
             }
+            return new qInsertModel(params);
         }
         else {
             return new qInsertModel(this);

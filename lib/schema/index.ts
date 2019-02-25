@@ -1,12 +1,13 @@
 export { DbSchema } from './DbSchema';
 export { DbField } from './DbField';
 export { Timestamp } from './types';
-export { SelectQueryTemplate, UpdateQueryTemplate } from './queries';
+export { SelectModelQuery, FetchQueryClass, InsertQueryClass, UpdateQueryClass, DeleteQueryClass } from './queries';
 
-import { buildSelectQueryTemplate, buildInsertQueryTemplate, buildUpdateQueryTemplate, buildDeleteQueryTemplate } from './queries';
+import { buildSelectQueryClass, buildFetchQueryClass, buildInsertQueryClass, buildUpdateQueryClass, buildDeleteQueryClass } from './queries';
 export const queries = {
-    buildSelectQueryTemplate: buildSelectQueryTemplate,
-    buildInsertQueryTemplate: buildInsertQueryTemplate,
-    buildUpdateQueryTemplate: buildUpdateQueryTemplate,
-    buildDeleteQueryTemplate: buildDeleteQueryTemplate
+    buildSelectQueryClass   : buildSelectQueryClass,
+    buildFetchQueryClass    : buildFetchQueryClass,
+    buildInsertQueryClass   : buildInsertQueryClass,
+    buildUpdateQueryClass   : buildUpdateQueryClass,
+    buildDeleteQueryClass   : buildDeleteQueryClass
 };

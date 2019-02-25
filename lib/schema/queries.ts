@@ -1,6 +1,6 @@
 // IMPORTS
 // ================================================================================================
-import { QueryMask, ResultQuery, ResultHandler, QueryTemplate } from '@nova/pg-dao';
+import { QueryMask, ResultQuery, ResultHandler } from '@nova/pg-dao';
 import { Query, stringifySingleParam, stringifyArrayParam } from '../Query';
 import { Model } from '../Model';
 import { ModelError, QueryError } from '../errors';
@@ -9,62 +9,98 @@ import { DbField } from './DbField';
 
 // INTERFACES
 // ================================================================================================
-export interface UpdateQueryTemplate {
-    new(params: any, changes: DbField[]): Query;
+export interface SelectModelQuery<T=any> {
+    new(mask: QueryMask, mutable: boolean): ResultQuery<T>;
 }
 
-export interface SelectQueryTemplate {
-    new(selector: any, forUpdate: boolean): ResultQuery;
+export interface FetchQueryClass {
+    new(selector: object, mutable: boolean): ResultQuery;
+}
+
+export interface InsertQueryClass {
+    new(params: object): Query<void>;
+}
+
+export interface UpdateQueryClass {
+    new(params: object, changes: DbField[]): Query<void>;
+}
+
+export interface DeleteQueryClass {
+    new(params: object): Query<void>;
+}
+
+// SELECT QUERY
+// ================================================================================================
+export function buildSelectQueryClass(schema: DbSchema, handler: ResultHandler): SelectModelQuery {
+
+    const selectText = buildSelectText(schema);
+    const fromText = schema.table;
+
+    return class implements ResultQuery {
+
+        readonly name       : string;
+        readonly mask       : QueryMask;
+        readonly handler    : ResultHandler;
+        readonly mutable    : boolean;
+        values?             : any[];
+
+        readonly select     : string;
+        from                : string;
+        where?              : string;
+
+        constructor(mask: QueryMask, mutable: boolean) {
+            this.name		= this.constructor.name;
+            this.mask       = mask;
+            this.handler    = handler;
+            this.mutable    = mutable || false;
+            this.select     = selectText;
+            this.from       = fromText;
+
+            // TODO: add values
+        }
+
+        get text(): string {
+            return `SELECT ${this.select} FROM ${this.from} WHERE ${this.where} ${ this.mutable ? 'FOR UPDATE' : ''};`;
+        }
+    } as SelectModelQuery;
 }
 
 // FETCH QUERY
 // ================================================================================================
-export function buildSelectQueryTemplate(schema: DbSchema, mask: QueryMask, handler: ResultHandler): SelectQueryTemplate {
+export function buildFetchQueryClass(schema: DbSchema, mask: QueryMask, handler: ResultHandler): FetchQueryClass {
     if (!schema) throw new ModelError('Cannot build a fetch query: model schema is undefined');
     
     const queryName = `qSelect${schema.name}Model${(mask === 'list' ? 's' : '')}`;
-    const queryBase = schema.selectSql;
+    const queryBase = `SELECT ${buildSelectText(schema)} FROM ${schema.table}`;
     
     return class implements ResultQuery {
 
-        name    : string;
-        mask    : QueryMask;
-        handler : ResultHandler;
+        readonly name       : string;
+        readonly mask       : QueryMask;
+        readonly handler    : ResultHandler;
+        readonly mutable    : boolean;
+
         text    : string;
         values? : any[];
 
-        constructor(selector: any, forUpdate: boolean) {
+        constructor(selector: any, mutable: boolean) {
             
             const values: any[] = [];
-            const criteria: string[] = [];
-            for (let filter in selector) {
-                let field = schema.getField(filter);
-                if (!field) {
-                    throw new QueryError('Cannot build a fetch query: model selector and schema are incompatible');
-                }
-
-                // TODO: check for custom serialization?
-                let paramValue = selector[filter];
-                if (paramValue && Array.isArray(paramValue)) {
-                    criteria.push(`${field.snakeName} IN (${stringifyArrayParam(paramValue, values)})`);
-                }
-                else {
-                    criteria.push(`${field.snakeName}=${stringifySingleParam(paramValue, values)}`);
-                }
-            }
+            const whereText = buildWhereText(schema, selector, values);
             
-            this.name = queryName;
-            this.text = queryBase + ` WHERE ${criteria.join(' AND ')} ${ forUpdate ? 'FOR UPDATE' : ''};`;
-            this.values = values.length ? values : undefined;
-            this.handler = handler;
-            this.mask = mask;
+            this.name       = queryName;
+            this.mask       = mask;
+            this.handler    = handler;
+            this.mutable    = mutable || false;
+            this.text       = queryBase + ` WHERE ${whereText} ${ mutable ? 'FOR UPDATE' : ''};`;
+            this.values     = values.length ? values : undefined;
         }
     };
 }
 
 // INSERT QUERY
 // ================================================================================================
-export function buildInsertQueryTemplate(schema: DbSchema): QueryTemplate<any> {
+export function buildInsertQueryClass(schema: DbSchema): InsertQueryClass {
     if (!schema) throw new ModelError('Cannot build INSERT query template: model schema is undefined');
     
     const fields: string[] = [];
@@ -83,7 +119,7 @@ export function buildInsertQueryTemplate(schema: DbSchema): QueryTemplate<any> {
 
 // UPDATE QUERY
 // ================================================================================================
-export function buildUpdateQueryTemplate(schema: DbSchema): UpdateQueryTemplate {
+export function buildUpdateQueryClass(schema: DbSchema): UpdateQueryClass {
     if (!schema) throw new ModelError('Cannot build UPDATE query: model schema is undefined');
     
     const queryName = `qUpdate${schema.name}Model`;
@@ -112,16 +148,57 @@ export function buildUpdateQueryTemplate(schema: DbSchema): UpdateQueryTemplate 
             this.text = queryBase + ` ${setters.join(', ')} WHERE id = '${model.id}';`;
             this.values = values.length ? values : undefined;
         }
-    };
+    } as UpdateQueryClass;
 }
 
 // DELETE QUERY
 // ================================================================================================
-export function buildDeleteQueryTemplate(schema: DbSchema): QueryTemplate<any> {
+export function buildDeleteQueryClass(schema: DbSchema): DeleteQueryClass {
     if (!schema) throw new ModelError('Cannot build DELETE query template: model schema is undefined');
     
     const name = `qDelete${schema.name}Model`
     const text = `DELETE FROM ${schema.table} WHERE id = {{id}};`;
 
     return Query.template(text, name);
+}
+
+// HELPER FUNCTIONS
+// ================================================================================================
+function buildSelectText(schema: DbSchema): string {
+
+    const fieldGetters: string[] = [];
+    for (let field of schema.fields) {
+        if (field.name === field.snakeName) {
+            fieldGetters.push(field.name);
+        }
+        else {
+            fieldGetters.push(`${field.snakeName} AS "${field.name}"`);
+        }
+    }
+
+    return fieldGetters.join(',');
+}
+
+function buildWhereText(schema: DbSchema, selector: any, values: any[]): string {
+    
+    const criteria: string[] = [];
+
+    // TODO: validate that selector is an object
+    for (let filter in selector) {
+        let field = schema.getField(filter);
+        if (!field) {
+            throw new QueryError('Cannot build a fetch query: model selector and schema are incompatible'); // TODO: model error?
+        }
+
+        // TODO: check for custom serialization?
+        let paramValue = selector[filter];
+        if (paramValue && Array.isArray(paramValue)) {
+            criteria.push(`${field.snakeName} IN (${stringifyArrayParam(paramValue, values)})`);
+        }
+        else {
+            criteria.push(`${field.snakeName}=${stringifySingleParam(paramValue, values)}`);
+        }
+    }
+
+    return criteria.join(' AND ');
 }

@@ -13,7 +13,6 @@ export class DbSchema implements IDbSchema {
 	readonly table          : string;
 	readonly idGenerator	: IdGenerator;
 	readonly fields		    : DbField[];
-    readonly selectSql      : string;
 
 	private readonly fieldMap   		: Map<string, DbField>;
 	private readonly customSerializers	: Map<string, DbField>;
@@ -73,18 +72,6 @@ export class DbSchema implements IDbSchema {
 				this.customSerializers.set(field.name, field);
 			}
         }
-        
-        // build select SQL
-        const fieldGetters: string[] = [];
-        for (let field of this.fields) {
-            if (field.name === field.snakeName) {
-                fieldGetters.push(field.name);
-            }
-            else {
-                fieldGetters.push(`${field.snakeName} AS "${field.name}"`);
-            }
-        }
-        this.selectSql = `SELECT ${fieldGetters.join(',')} FROM ${this.table}`;
     }
 
     // PUBLIC ACCESSORS

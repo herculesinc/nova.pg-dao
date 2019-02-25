@@ -1,9 +1,7 @@
 // IMPORTS
 // ================================================================================================
-import { 
-    FieldDescriptor, Query, ListResultQuery, SingleResultQuery, QueryTemplate, IdGenerator, FieldMap
-} from '@nova/pg-dao';
-import { DbSchema, DbField, SelectQueryTemplate, UpdateQueryTemplate, queries } from './schema';
+import { FieldDescriptor, Query, ListResultQuery, SingleResultQuery, IdGenerator, FieldMap, } from '@nova/pg-dao';
+import { DbSchema, DbField, FetchQueryClass, InsertQueryClass, UpdateQueryClass, DeleteQueryClass, queries } from './schema';
 import { ModelError } from './errors';
 
 // MODULE VARIABLES
@@ -14,17 +12,34 @@ export const symMutable = Symbol();
 
 const symOriginal = Symbol();
 
+// PUBLIC FUNCTIONS
+// ================================================================================================
+export function getModelClass(model: Model): typeof Model {
+    if (!model) throw new TypeError('Model is undefined');
+    const modelClass = model.constructor as typeof Model;
+    if (modelClass.prototype instanceof Model === false) {
+        throw new TypeError('Model is invalid');
+    } 
+    return modelClass;
+}
+
+export function isModelClass(modelClass: any): modelClass is typeof Model {
+    if (!modelClass) throw TypeError('Model class is undefined');
+    if (!modelClass.prototype) return false;
+    return modelClass.prototype instanceof Model;
+}
+
 // CLASS DEFINITION
 // ================================================================================================
 export class Model {
 
     private static schema   : DbSchema;
 
-    static qFetchOneModel   : SelectQueryTemplate;
-    static qFetchAllModels  : SelectQueryTemplate;
-    static qInsertModel     : QueryTemplate<any>;
-    static qUpdateModel     : UpdateQueryTemplate;
-    static qDeleteModel     : QueryTemplate<any>;
+    static qFetchOneModel   : FetchQueryClass;
+    static qFetchAllModels  : FetchQueryClass;
+    static qInsertModel     : InsertQueryClass;
+    static qUpdateModel     : UpdateQueryClass;
+    static qDeleteModel     : DeleteQueryClass;
 
     readonly id!            : string;    
     readonly createdOn!     : number;
@@ -39,13 +54,15 @@ export class Model {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     constructor(seed: string[] | object, fields: FieldDescriptor[]) {
-        if (!seed) throw new ModelError('Cannot instantiate a model: model seed is undefined');
+        if (!seed) throw new TypeError('Model seed is undefined');
 
         if (Array.isArray(seed)) {
-            // TODO: this.infuse(seed);
+            if (!fields) throw new TypeError('Models fields are undefined');
+            if (!Array.isArray(fields)) throw new TypeError('Model fields are invalid');
+            this.infuse(seed, fields);
         }
         else {
-
+            // TODO: build model
         }
 
         // initialize internal state
@@ -59,6 +76,14 @@ export class Model {
     static parse<T extends typeof Model>(this: T, rowData: string[], fields: FieldDescriptor[]): InstanceType<T> {
         return (new this(rowData, fields) as InstanceType<T>);
     }
+
+    /*
+    static SelectQueryBase<T extends typeof Model>(this: T, mask: 'list'): SelectModelQuery2<InstanceType<T>>
+    static SelectQueryBase<T extends typeof Model>(this: T, mask: 'single'): SelectModelQuery<InstanceType<T>>
+    static SelectQueryBase<T extends typeof Model>(this: T, mask: QueryMask): any {
+        return this.SelectQuery as any;
+    }
+    */
 
     static getFetchOneQuery<T extends typeof Model>(this: T, selector: any, forUpdate: boolean): SingleResultQuery<InstanceType<T>> {
         return (new this.qFetchOneModel(selector, forUpdate) as SingleResultQuery<InstanceType<T>>);
@@ -76,11 +101,13 @@ export class Model {
         this.schema = schema;
 
         // build query templates
-        this.qFetchAllModels = queries.buildSelectQueryTemplate(schema, 'list', this);
-        this.qFetchOneModel = queries.buildSelectQueryTemplate(schema, 'single', this);
-        this.qInsertModel = queries.buildInsertQueryTemplate(schema);
-        this.qUpdateModel = queries.buildUpdateQueryTemplate(schema);
-        this.qDeleteModel = queries.buildDeleteQueryTemplate(schema);
+        this.qFetchAllModels = queries.buildFetchQueryClass(schema, 'list', this);
+        this.qFetchOneModel = queries.buildFetchQueryClass(schema, 'single', this);
+        this.qInsertModel = queries.buildInsertQueryClass(schema);
+        this.qUpdateModel = queries.buildUpdateQueryClass(schema);
+        this.qDeleteModel = queries.buildDeleteQueryClass(schema);
+
+        // this.SelectQuery = queries.buildSelectQueryClass(schema, this);
     }
 
     static getSchema(): DbSchema {
@@ -89,31 +116,51 @@ export class Model {
 
     // STATE ACCESSORS
     // --------------------------------------------------------------------------------------------
-    isMutable(): boolean {
+    get isMutable(): boolean {
         return this[symMutable];
     }
 
-    isCreated(): boolean {
+    get isCreated(): boolean {
         return this[symCreated];
     }
 
-    isDeleted() {
+    get isDeleted(): boolean {
         return this[symDeleted];
+    }
+
+    get isModified(): boolean {
+        const schema = (this.constructor as typeof Model).getSchema();
+        const original = this[symOriginal];
+
+        for (let field of schema.fields) {
+            if (field.readonly) continue;
+
+            let fieldName = field.name as keyof this;
+            if (field.areEqual) {
+                if (!field.areEqual(this[fieldName], original[fieldName])) return true;
+            }
+            else {
+                if (this[fieldName] !== original[fieldName]) return true;
+            }
+        }
+
+        return false;
     }
 
     // MODEL METHODS
     // --------------------------------------------------------------------------------------------
-    infuse(rowData: string[], fields: FieldDescriptor[]) {
+    infuse(rowData: string[], dbFields: FieldDescriptor[]) {
         const schema = (this.constructor as typeof Model).getSchema();
-        const original = [];
+        const original: any = {};
         for (let i = 0; i < schema.fields.length; i++) {
             let field = schema.fields[i];
-            let fieldValue = field.parse ? field.parse(rowData[i]) : fields[i].parser(rowData[i]);
-            this[field.name as keyof this] = fieldValue;
+            let fieldName = field.name as keyof this;
+            let fieldValue = field.parse ? field.parse(rowData[i]) : dbFields[i].parser(rowData[i]);
+            this[fieldName] = fieldValue;
 
             // don't keep originals of read-only fields
             if (field.readonly) continue;
-            original[i] = field.clone ? field.clone(fieldValue) : fieldValue;
+            original[fieldName] = field.clone ? field.clone(fieldValue) : fieldValue;
         }
         this[symOriginal] = original;
     }
@@ -156,6 +203,18 @@ export class Model {
         return queries;
     }
 
+    applyChanges() {
+        const schema = (this.constructor as typeof Model).getSchema();
+        const original: any = {};
+        for (let field of schema.fields) {
+            if (field.readonly) continue;
+            let fieldName = field.name as keyof this;
+            let fieldValue = this[fieldName];
+            original[fieldName] = field.clone ? field.clone(fieldValue) : fieldValue;
+        }
+        this[symOriginal] = original;
+    }
+
     // PRIVATE METHODS
     // --------------------------------------------------------------------------------------------
     private buildInsertQuery() {
@@ -170,6 +229,7 @@ export class Model {
                 let fieldValue = this[fieldName];
                 params[fieldName] = field.serialize ? field.serialize(fieldValue) : fieldValue;
             }
+            return new qInsertModel(params);
         }
         else {
             return new qInsertModel(this);

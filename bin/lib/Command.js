@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const results_1 = require("./results");
 const errors_1 = require("./errors");
 const util = require("./util");
+;
 // MODULE VARIABLES
 // ================================================================================================
 const COMMAND_COMPLETE_REGEX = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/;
@@ -11,8 +12,9 @@ const COMMAND_COMPLETE_REGEX = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/;
 class Command {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(logger, source, logQueryText) {
+    constructor(store, logger, source, logQueryText) {
         this.id = util.generateTimeId();
+        this.store = store;
         this.source = source;
         this.logger = logger;
         this.logQueryText = logQueryText;
@@ -48,7 +50,7 @@ class Command {
         else if (query.values !== undefined) {
             throw new errors_1.QueryError(`Query values must be an array`);
         }
-        const result = results_1.createResult(query);
+        const result = results_1.createResult(query, this.store);
         this.results.push(result);
         return result.promise;
     }

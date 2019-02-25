@@ -3,8 +3,9 @@
 import { Logger, TraceSource, TraceCommand } from '@nova/core';
 import { Result, createResult } from './results';
 import { Query } from './Query';
+import { Store } from './Store'
 import { QueryError, ParseError } from './errors';
-import * as util from './util';
+import * as util from './util';;
 
 // MODULE VARIABLES
 // ================================================================================================
@@ -15,6 +16,7 @@ const COMMAND_COMPLETE_REGEX = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/;
 export class Command implements IQuery {
 
     private readonly id             : string;
+    private readonly store          : Store;
     private readonly source         : TraceSource;
     private readonly logger         : Logger;
     private readonly logQueryText   : boolean;
@@ -31,9 +33,10 @@ export class Command implements IQuery {
 
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(logger: Logger, source: TraceSource, logQueryText: boolean) {
+    constructor(store: Store, logger: Logger, source: TraceSource, logQueryText: boolean) {
 
         this.id = util.generateTimeId();
+        this.store = store;
         this.source = source;
         this.logger = logger;
         this.logQueryText = logQueryText;
@@ -75,7 +78,7 @@ export class Command implements IQuery {
             throw new QueryError(`Query values must be an array`);
         }
 
-        const result = createResult(query);
+        const result = createResult(query, this.store);
         this.results.push(result);
         return result.promise;
     }

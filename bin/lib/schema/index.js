@@ -8,9 +8,10 @@ var types_1 = require("./types");
 exports.Timestamp = types_1.Timestamp;
 const queries_1 = require("./queries");
 exports.queries = {
-    buildSelectQueryTemplate: queries_1.buildSelectQueryTemplate,
-    buildInsertQueryTemplate: queries_1.buildInsertQueryTemplate,
-    buildUpdateQueryTemplate: queries_1.buildUpdateQueryTemplate,
-    buildDeleteQueryTemplate: queries_1.buildDeleteQueryTemplate
+    buildSelectQueryClass: queries_1.buildSelectQueryClass,
+    buildFetchQueryClass: queries_1.buildFetchQueryClass,
+    buildInsertQueryClass: queries_1.buildInsertQueryClass,
+    buildUpdateQueryClass: queries_1.buildUpdateQueryClass,
+    buildDeleteQueryClass: queries_1.buildDeleteQueryClass
 };
 //# sourceMappingURL=index.js.map

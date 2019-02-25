@@ -1,7 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const errors_1 = require("./errors");
 const Command_1 = require("./Command");
+const Store_1 = require("./Store");
+const errors_1 = require("./errors");
 // CLASS DEFINITION
 // ================================================================================================
 class DaoSession {
@@ -13,6 +14,7 @@ class DaoSession {
         this.readonly = options.readonly;
         this.logQueryText = options.logQueryText;
         this.logger = logger;
+        this.store = new Store_1.Store();
         this.state = 1 /* pending */;
         this.client = undefined;
         this.commands = [];
@@ -113,7 +115,7 @@ class DaoSession {
     // --------------------------------------------------------------------------------------------
     queueFirstCommand() {
         // create a command and add it to the command queue
-        const command = new Command_1.Command(this.logger, this.source, this.logQueryText);
+        const command = new Command_1.Command(this.store, this.logger, this.source, this.logQueryText);
         this.commands.push(command);
         // add begin transaction query to the command
         const txStartQuery = this.readonly ? BEGIN_RO_TRANSACTION : BEGIN_RW_TRANSACTION;
@@ -126,7 +128,7 @@ class DaoSession {
         let result;
         if (query.values) {
             // if parameterized query, it must start a new command
-            const command = new Command_1.Command(this.logger, this.source, this.logQueryText);
+            const command = new Command_1.Command(this.store, this.logger, this.source, this.logQueryText);
             this.commands.push(command);
             result = command.add(query);
             ;
@@ -138,7 +140,7 @@ class DaoSession {
             // try to append the query to the last command in the queue
             let command = this.commands[this.commands.length - 1];
             if (!command || command.isParameterized) {
-                command = new Command_1.Command(this.logger, this.source, this.logQueryText);
+                command = new Command_1.Command(this.store, this.logger, this.source, this.logQueryText);
                 this.commands.push(command);
             }
             result = command.add(query);
