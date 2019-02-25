@@ -147,15 +147,33 @@ function buildParamSpec(paramMatch: string): ParamSpec {
 function stringifyRawSingleParam(value: any, values: string[]) {
     if (value === undefined || value === null) return 'null';
 
-    const valueType = typeof value;
-    if (valueType === 'string') {
+    switch (typeof value) {
+        case 'string': {
         return value;
     }
-    else if (valueType === 'number') {
+        case 'number': case 'bigint': {
+            return value.toString(10);
+        }
+        case 'boolean': {
         return value.toString();
     }
-    else {
-        throw new Error(`Raw query parameter cannot be ${valueType} value`);
+        default: {
+            const pvalue = value.valueOf();
+            switch (typeof pvalue) {
+                case 'string': {
+                    return pvalue;
+    }
+                case 'number': case 'bigint': {
+                    return pvalue.toString(10);
+}
+                case 'boolean': {
+                    return pvalue.toString();
+                }                
+                default: {
+                    throw new Error(`Raw query parameter cannot be reduced to a primitive value`);
+                }
+            }
+        }
     }
 }
 
@@ -163,11 +181,14 @@ export function stringifySingleParam(value: any, values: string[]): string {
     if (value === undefined || value === null) return 'null';
 
     switch (typeof value) {
-        case 'number': case 'boolean': {
-            return value.toString();
-        }
         case 'string':{
             return isSafeString(value) ? '\'' + value + '\'' : '$' + values.push(value);
+        }
+        case 'number': case 'bigint': {
+            return value.toString(10);
+        }
+        case 'boolean': {
+            return value.toString();
         }
         case 'function': {
             const pvalue = value.valueOf();
@@ -198,7 +219,9 @@ export function stringifySingleParam(value: any, values: string[]): string {
 }
 
 function stringifyRawArrayParam(array: any[], values: string[]): string {
-    if (array === undefined || array === null || array.length === 0) return 'null';
+    if (array === undefined || array === null) return 'null';
+    if (!Array.isArray(array)) throw new Error('Raw query parameter must be an array');
+    if (array.length === 0) return 'null';
 
     const paramValues: string[] = [];
     const arrayType = typeof array[0];
@@ -207,16 +230,16 @@ function stringifyRawArrayParam(array: any[], values: string[]): string {
 
         let valueType = typeof value;
         if (valueType !== arrayType)
-            throw new Error('Query parameter cannot be an array of mixed values');
+            throw new Error('Raw query parameter array cannot contain values of mixed type');
 
         if (valueType === 'string') {
             paramValues.push(value);
         }
-        else if (valueType === 'number') {
-            paramValues.push(value.toString());
+        else if (valueType === 'number' || valueType === 'bigint') {
+            paramValues.push(value.toString(10));
         }
         else {
-            throw new Error(`Query parameter array cannot contain ${valueType} values`);
+            throw new Error(`Raw query parameter array cannot contain ${valueType} values`);
         }
     }
 
@@ -224,8 +247,9 @@ function stringifyRawArrayParam(array: any[], values: string[]): string {
 }
 
 export function stringifyArrayParam(array: any[], values: string[]): string {
-    if (array === undefined || array === null || array.length === 0) return 'null';
+    if (array === undefined || array === null) return 'null';
     if (!Array.isArray(array)) throw new Error('Query parameter must be an array');
+    if (array.length === 0) return 'null';
 
     const paramValues: string[] = [];
     const arrayType = typeof array[0];
@@ -234,7 +258,7 @@ export function stringifyArrayParam(array: any[], values: string[]): string {
 
         let valueType = typeof value;
         if (valueType !== arrayType)
-            throw new Error('Query parameter cannot be an array of mixed values');
+            throw new Error('Query parameter array cannot contain values of mixed type');
 
         if (valueType === 'string') {
             if (isSafeString(value)) {
@@ -244,7 +268,7 @@ export function stringifyArrayParam(array: any[], values: string[]): string {
                 paramValues.push('$' + values.push(value));
             }
         }
-        else if (valueType === 'number') {
+        else if (valueType === 'number' || valueType === 'bigint') {
             paramValues.push(value.toString());
         }
         else {
