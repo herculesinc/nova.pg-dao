@@ -19,7 +19,7 @@ const options: SessionOptions = {
 
 const logger = new MockLogger();
 
-describe.only('NOVA.PG-DAO -> Session;', () => {
+describe('NOVA.PG-DAO -> Session;', () => {
     describe('Query tests;', () => {
 
         beforeEach(async () => {

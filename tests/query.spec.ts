@@ -191,9 +191,9 @@ describe('NOVA.PG-DAO -> Query;', () => {
             func.toJSON = () => 'function() {}';
 
             const errorTextSection1 = 'Query parameter cannot be a function';
-            const errorTextSection2 = (type: string): string => `Raw query parameter cannot be ${type} value`;
+            const errorTextSection2 = 'Raw query parameter cannot be reduced to a primitive value';
             const errorTextSection3 = 'Query parameter must be an array';
-            const errorTextSection4 = 'Query parameter must be an array';
+            const errorTextSection4 = 'Raw query parameter must be an array';
 
             [
                 {
@@ -236,11 +236,11 @@ describe('NOVA.PG-DAO -> Query;', () => {
                         {id: '12\'4',       result: 'SELECT * FROM accounts WHERE id = 12\'4;\n'},
                         {id: '12\\4',       result: 'SELECT * FROM accounts WHERE id = 12\\4;\n'},
 
-                        {id: buffer,        error: errorTextSection2('buffer')},
-                        {id: [1,2,3,4],     error: errorTextSection2('array')},
-                        {id: {a: 1},        error: errorTextSection2('object')},
-                        {id: arrFunc,       error: errorTextSection2('function')},
-                        {id: func,          error: errorTextSection2('function')}
+                        {id: buffer,        error: errorTextSection2},
+                        {id: [1,2,3,4],     error: errorTextSection2},
+                        {id: {a: 1},        error: errorTextSection2},
+                        {id: arrFunc,       error: errorTextSection2},
+                        {id: func,          error: errorTextSection2}
                     ]
                 },
                 {
@@ -264,7 +264,7 @@ describe('NOVA.PG-DAO -> Query;', () => {
                         {id: vFunc,         error: errorTextSection3},
                         {id: '12\'4',       error: errorTextSection3},
                         {id: '12\\4',       error: errorTextSection3},
-                        {id: [12, '12\'4'], error: 'Query parameter cannot be an array of mixed values'},
+                        {id: [12, '12\'4'], error: 'Query parameter array cannot contain values of mixed type'},
                         {id: {a: '12\'3'},  error: errorTextSection3},
                         {id: [{id: 1}],     error: 'Query parameter array cannot contain object values'},
                         {id: arrFunc,       error: errorTextSection3},
@@ -292,9 +292,9 @@ describe('NOVA.PG-DAO -> Query;', () => {
                         {id: vFunc,         error: errorTextSection4},
                         {id: '12\'4',       error: errorTextSection4},
                         {id: '12\\4',       error: errorTextSection4},
-                        {id: [12, '12\'4'], error: 'Query parameter cannot be an array of mixed values'},
+                        {id: [12, '12\'4'], error: 'Raw query parameter array cannot contain values of mixed type'},
                         {id: {a: '12\'3'},  error: errorTextSection4},
-                        {id: [{id: 1}],     error: 'Query parameter array cannot contain object values'},
+                        {id: [{id: 1}],     error: 'Raw query parameter array cannot contain object values'},
                         {id: arrFunc,       error: errorTextSection4},
                         {id: func,          error: errorTextSection4}
                     ]
