@@ -208,7 +208,4 @@ class Model {
     }
 }
 exports.Model = Model;
-class Account extends Model {
-}
-const x = Account.getFetchOneQuery(undefined, true);
 //# sourceMappingURL=Model.js.map

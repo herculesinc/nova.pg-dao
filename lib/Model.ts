@@ -246,10 +246,3 @@ export class Model {
         return new qDeleteModel(this);
     }
 }
-
-
-class Account extends Model {
-
-}
-
-const x = Account.getFetchOneQuery(undefined, true);
