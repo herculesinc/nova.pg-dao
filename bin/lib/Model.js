@@ -56,18 +56,16 @@ class Model {
     static parse(rowData, fields) {
         return new this(rowData, fields);
     }
-    /*
-    static SelectQueryBase<T extends typeof Model>(this: T, mask: 'list'): SelectModelQuery2<InstanceType<T>>
-    static SelectQueryBase<T extends typeof Model>(this: T, mask: 'single'): SelectModelQuery<InstanceType<T>>
-    static SelectQueryBase<T extends typeof Model>(this: T, mask: QueryMask): any {
-        return this.SelectQuery as any;
-    }
-    */
-    static getFetchOneQuery(selector, forUpdate) {
-        return new this.qFetchOneModel(selector, forUpdate);
-    }
-    static getFetchAllQuery(selector, forUpdate) {
-        return new this.qFetchAllModels(selector, forUpdate);
+    static SelectQuery(mask) {
+        if (mask === 'single') {
+            return this.qSelectOneModel;
+        }
+        else if (mask === 'list') {
+            return this.qSelectOneModel;
+        }
+        else {
+            // TODO: throw error
+        }
     }
     static setSchema(tableName, idGenerator, fields) {
         // create and set schema
@@ -77,12 +75,11 @@ class Model {
         const schema = new schema_1.DbSchema(modelName, tableName, idGenerator, fields);
         this.schema = schema;
         // build query templates
-        this.qFetchAllModels = schema_1.queries.buildFetchQueryClass(schema, 'list', this);
-        this.qFetchOneModel = schema_1.queries.buildFetchQueryClass(schema, 'single', this);
+        this.qSelectAllModels = schema_1.queries.buildSelectQueryClass(schema, 'list', this);
+        this.qSelectOneModel = schema_1.queries.buildSelectQueryClass(schema, 'single', this);
         this.qInsertModel = schema_1.queries.buildInsertQueryClass(schema);
         this.qUpdateModel = schema_1.queries.buildUpdateQueryClass(schema);
         this.qDeleteModel = schema_1.queries.buildDeleteQueryClass(schema);
-        // this.SelectQuery = queries.buildSelectQueryClass(schema, this);
     }
     static getSchema() {
         return this.schema;

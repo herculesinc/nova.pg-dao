@@ -4,46 +4,32 @@ const Query_1 = require("../Query");
 const errors_1 = require("../errors");
 // SELECT QUERY
 // ================================================================================================
-function buildSelectQueryClass(schema, handler) {
+function buildSelectQueryClass(schema, mask, handler) {
+    const queryName = `qSelect${schema.name}Model${(mask === 'list' ? 's' : '')}`;
     const selectText = buildSelectText(schema);
     const fromText = schema.table;
     return class {
-        constructor(mask, mutable) {
-            this.name = this.constructor.name;
+        constructor(mutable, selector) {
+            this.name = this.constructor.name || queryName;
             this.mask = mask;
             this.handler = handler;
             this.mutable = mutable || false;
             this.select = selectText;
             this.from = fromText;
-            // TODO: add values
+            this.paramValues = [];
+            if (selector) {
+                this.where = buildWhereText(schema, selector, this.paramValues);
+            }
         }
         get text() {
             return `SELECT ${this.select} FROM ${this.from} WHERE ${this.where} ${this.mutable ? 'FOR UPDATE' : ''};`;
         }
-    };
-}
-exports.buildSelectQueryClass = buildSelectQueryClass;
-// FETCH QUERY
-// ================================================================================================
-function buildFetchQueryClass(schema, mask, handler) {
-    if (!schema)
-        throw new errors_1.ModelError('Cannot build a fetch query: model schema is undefined');
-    const queryName = `qSelect${schema.name}Model${(mask === 'list' ? 's' : '')}`;
-    const queryBase = `SELECT ${buildSelectText(schema)} FROM ${schema.table}`;
-    return class {
-        constructor(selector, mutable) {
-            const values = [];
-            const whereText = buildWhereText(schema, selector, values);
-            this.name = queryName;
-            this.mask = mask;
-            this.handler = handler;
-            this.mutable = mutable || false;
-            this.text = queryBase + ` WHERE ${whereText} ${mutable ? 'FOR UPDATE' : ''};`;
-            this.values = values.length ? values : undefined;
+        get values() {
+            return (this.paramValues.length > 0) ? this.paramValues : undefined;
         }
     };
 }
-exports.buildFetchQueryClass = buildFetchQueryClass;
+exports.buildSelectQueryClass = buildSelectQueryClass;
 // INSERT QUERY
 // ================================================================================================
 function buildInsertQueryClass(schema) {

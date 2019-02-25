@@ -10,29 +10,26 @@ import { DbField } from './DbField';
 // INTERFACES
 // ================================================================================================
 export interface SelectModelQuery<T=any> {
-    new(mask: QueryMask, mutable: boolean): ResultQuery<T>;
+    new(mutable: boolean, selector?: object): ResultQuery<T>;
 }
 
-export interface FetchQueryClass {
-    new(selector: object, mutable: boolean): ResultQuery;
-}
-
-export interface InsertQueryClass {
+export interface InsertModelQuery {
     new(params: object): Query<void>;
 }
 
-export interface UpdateQueryClass {
+export interface UpdateModelQuery {
     new(params: object, changes: DbField[]): Query<void>;
 }
 
-export interface DeleteQueryClass {
+export interface DeleteModelQuery {
     new(params: object): Query<void>;
 }
 
 // SELECT QUERY
 // ================================================================================================
-export function buildSelectQueryClass(schema: DbSchema, handler: ResultHandler): SelectModelQuery {
+export function buildSelectQueryClass(schema: DbSchema, mask: QueryMask, handler: ResultHandler): SelectModelQuery {
 
+    const queryName = `qSelect${schema.name}Model${(mask === 'list' ? 's' : '')}`;
     const selectText = buildSelectText(schema);
     const fromText = schema.table;
 
@@ -42,65 +39,39 @@ export function buildSelectQueryClass(schema: DbSchema, handler: ResultHandler):
         readonly mask       : QueryMask;
         readonly handler    : ResultHandler;
         readonly mutable    : boolean;
-        values?             : any[];
 
         readonly select     : string;
         from                : string;
         where?              : string;
+        readonly paramValues: any[];
 
-        constructor(mask: QueryMask, mutable: boolean) {
-            this.name		= this.constructor.name;
+        constructor(mutable: boolean, selector?: object) {
+            this.name		= this.constructor.name || queryName;
             this.mask       = mask;
             this.handler    = handler;
             this.mutable    = mutable || false;
             this.select     = selectText;
             this.from       = fromText;
+            this.paramValues= [];
 
-            // TODO: add values
+            if (selector) {
+                this.where  = buildWhereText(schema, selector, this.paramValues);
+            }
         }
 
         get text(): string {
             return `SELECT ${this.select} FROM ${this.from} WHERE ${this.where} ${ this.mutable ? 'FOR UPDATE' : ''};`;
         }
-    } as SelectModelQuery;
-}
 
-// FETCH QUERY
-// ================================================================================================
-export function buildFetchQueryClass(schema: DbSchema, mask: QueryMask, handler: ResultHandler): FetchQueryClass {
-    if (!schema) throw new ModelError('Cannot build a fetch query: model schema is undefined');
-    
-    const queryName = `qSelect${schema.name}Model${(mask === 'list' ? 's' : '')}`;
-    const queryBase = `SELECT ${buildSelectText(schema)} FROM ${schema.table}`;
-    
-    return class implements ResultQuery {
-
-        readonly name       : string;
-        readonly mask       : QueryMask;
-        readonly handler    : ResultHandler;
-        readonly mutable    : boolean;
-
-        text    : string;
-        values? : any[];
-
-        constructor(selector: any, mutable: boolean) {
-            
-            const values: any[] = [];
-            const whereText = buildWhereText(schema, selector, values);
-            
-            this.name       = queryName;
-            this.mask       = mask;
-            this.handler    = handler;
-            this.mutable    = mutable || false;
-            this.text       = queryBase + ` WHERE ${whereText} ${ mutable ? 'FOR UPDATE' : ''};`;
-            this.values     = values.length ? values : undefined;
+        get values(): any[] | undefined {
+            return (this.paramValues.length > 0) ? this.paramValues : undefined;
         }
     };
 }
 
 // INSERT QUERY
 // ================================================================================================
-export function buildInsertQueryClass(schema: DbSchema): InsertQueryClass {
+export function buildInsertQueryClass(schema: DbSchema): InsertModelQuery {
     if (!schema) throw new ModelError('Cannot build INSERT query template: model schema is undefined');
     
     const fields: string[] = [];
@@ -119,7 +90,7 @@ export function buildInsertQueryClass(schema: DbSchema): InsertQueryClass {
 
 // UPDATE QUERY
 // ================================================================================================
-export function buildUpdateQueryClass(schema: DbSchema): UpdateQueryClass {
+export function buildUpdateQueryClass(schema: DbSchema): UpdateModelQuery {
     if (!schema) throw new ModelError('Cannot build UPDATE query: model schema is undefined');
     
     const queryName = `qUpdate${schema.name}Model`;
@@ -148,12 +119,12 @@ export function buildUpdateQueryClass(schema: DbSchema): UpdateQueryClass {
             this.text = queryBase + ` ${setters.join(', ')} WHERE id = '${model.id}';`;
             this.values = values.length ? values : undefined;
         }
-    } as UpdateQueryClass;
+    } as UpdateModelQuery;
 }
 
 // DELETE QUERY
 // ================================================================================================
-export function buildDeleteQueryClass(schema: DbSchema): DeleteQueryClass {
+export function buildDeleteQueryClass(schema: DbSchema): DeleteModelQuery {
     if (!schema) throw new ModelError('Cannot build DELETE query template: model schema is undefined');
     
     const name = `qDelete${schema.name}Model`

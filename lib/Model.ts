@@ -1,8 +1,9 @@
 // IMPORTS
 // ================================================================================================
-import { FieldDescriptor, Query, ListResultQuery, SingleResultQuery, IdGenerator, FieldMap, } from '@nova/pg-dao';
-import { DbSchema, DbField, FetchQueryClass, InsertQueryClass, UpdateQueryClass, DeleteQueryClass, queries } from './schema';
+import { FieldDescriptor, Query, SelectAllModelsQuery, SelectOneModelQuery, IdGenerator, FieldMap, QueryMask } from '@nova/pg-dao';
+import { DbSchema, DbField, SelectModelQuery, InsertModelQuery, UpdateModelQuery, DeleteModelQuery, queries } from './schema';
 import { ModelError } from './errors';
+import { DaoSession } from './Session';
 
 // MODULE VARIABLES
 // ================================================================================================
@@ -35,11 +36,11 @@ export class Model {
 
     private static schema   : DbSchema;
 
-    static qFetchOneModel   : FetchQueryClass;
-    static qFetchAllModels  : FetchQueryClass;
-    static qInsertModel     : InsertQueryClass;
-    static qUpdateModel     : UpdateQueryClass;
-    static qDeleteModel     : DeleteQueryClass;
+    static qSelectOneModel  : SelectModelQuery;
+    static qSelectAllModels : SelectModelQuery;
+    static qInsertModel     : InsertModelQuery;
+    static qUpdateModel     : UpdateModelQuery;
+    static qDeleteModel     : DeleteModelQuery;
 
     readonly id!            : string;    
     readonly createdOn!     : number;
@@ -77,20 +78,18 @@ export class Model {
         return (new this(rowData, fields) as InstanceType<T>);
     }
 
-    /*
-    static SelectQueryBase<T extends typeof Model>(this: T, mask: 'list'): SelectModelQuery2<InstanceType<T>>
-    static SelectQueryBase<T extends typeof Model>(this: T, mask: 'single'): SelectModelQuery<InstanceType<T>>
-    static SelectQueryBase<T extends typeof Model>(this: T, mask: QueryMask): any {
-        return this.SelectQuery as any;
-    }
-    */
-
-    static getFetchOneQuery<T extends typeof Model>(this: T, selector: any, forUpdate: boolean): SingleResultQuery<InstanceType<T>> {
-        return (new this.qFetchOneModel(selector, forUpdate) as SingleResultQuery<InstanceType<T>>);
-    }
-
-    static getFetchAllQuery<T extends typeof Model>(selector: any, forUpdate: boolean): ListResultQuery<InstanceType<T>> {
-        return (new this.qFetchAllModels(selector, forUpdate) as ListResultQuery<InstanceType<T>>);
+    static SelectQuery<T extends typeof Model>(this: T, mask: 'list'): SelectAllModelsQuery<InstanceType<T>>
+    static SelectQuery<T extends typeof Model>(this: T, mask: 'single'): SelectOneModelQuery<InstanceType<T>>
+    static SelectQuery<T extends typeof Model>(this: T, mask: QueryMask): any {
+        if (mask === 'single') {
+            return this.qSelectOneModel;
+        }
+        else if (mask === 'list') {
+            return this.qSelectOneModel;
+        }
+        else {
+            // TODO: throw error
+        }
     }
 
     static setSchema(tableName: string, idGenerator: IdGenerator, fields: FieldMap) {
@@ -101,13 +100,11 @@ export class Model {
         this.schema = schema;
 
         // build query templates
-        this.qFetchAllModels = queries.buildFetchQueryClass(schema, 'list', this);
-        this.qFetchOneModel = queries.buildFetchQueryClass(schema, 'single', this);
+        this.qSelectAllModels = queries.buildSelectQueryClass(schema, 'list', this);
+        this.qSelectOneModel = queries.buildSelectQueryClass(schema, 'single', this);
         this.qInsertModel = queries.buildInsertQueryClass(schema);
         this.qUpdateModel = queries.buildUpdateQueryClass(schema);
         this.qDeleteModel = queries.buildDeleteQueryClass(schema);
-
-        // this.SelectQuery = queries.buildSelectQueryClass(schema, this);
     }
 
     static getSchema(): DbSchema {
@@ -246,3 +243,4 @@ export class Model {
         return new qDeleteModel(this);
     }
 }
+

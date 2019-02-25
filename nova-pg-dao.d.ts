@@ -225,11 +225,27 @@ declare module "@nova/pg-dao" {
         isDeleted(): boolean;
         isModified(): boolean;
 
-        static getFetchAllQuery<T extends typeof Model>(selector: any, forUpdate: boolean): ListResultQuery<InstanceType<T>>;
-        static getFetchOneQuery<T extends typeof Model>(this: T, selector: any, forUpdate: boolean): SingleResultQuery<InstanceType<T>>;
+        static SelectQuery<T extends typeof Model>(this: T, mask: 'list'): SelectAllModelsQuery<InstanceType<T>>;
+        static SelectQuery<T extends typeof Model>(this: T, mask: 'single'): SelectOneModelQuery<InstanceType<T>>;
 
         static setSchema(table: string, idGenerator: IdGenerator, fields: FieldMap): DbSchema;
         static getSchema(): DbSchema;
+    }
+
+    export interface SelectOneModelQuery<T=any> {
+        new(mutable: boolean, selector?: object): SingleResultQuery<T> & ModelQueryInstance;
+    }
+    
+    export interface SelectAllModelsQuery<T=any> {
+        new(mutable: boolean, selector?: object): ListResultQuery<T> & ModelQueryInstance;
+    }
+
+    interface ModelQueryInstance {
+        readonly mutable    : boolean;
+        readonly select     : string;
+        from                : string;
+        where?              : string;
+        readonly paramValues: any[];
     }
 
     // ERROR CLASSES

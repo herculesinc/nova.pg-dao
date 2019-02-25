@@ -9,7 +9,6 @@ exports.Timestamp = types_1.Timestamp;
 const queries_1 = require("./queries");
 exports.queries = {
     buildSelectQueryClass: queries_1.buildSelectQueryClass,
-    buildFetchQueryClass: queries_1.buildFetchQueryClass,
     buildInsertQueryClass: queries_1.buildInsertQueryClass,
     buildUpdateQueryClass: queries_1.buildUpdateQueryClass,
     buildDeleteQueryClass: queries_1.buildDeleteQueryClass
