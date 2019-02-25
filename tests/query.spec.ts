@@ -73,6 +73,8 @@ describe('NOVA.PG-DAO -> Query;', () => {
                 {query: undefined, name: 'a',  options: undefined, error: notStringQueryTextError},
                 {query: null,      name: 'a',  options: undefined, error: notStringQueryTextError},
                 {query: 153,       name: 'a',  options: undefined, error: notStringQueryTextError},
+                {query: [],        name: 'a',  options: undefined, error: notStringQueryTextError},
+                {query: {},        name: 'a',  options: undefined, error: notStringQueryTextError},
                 {query: '',        name: 'a',  options: undefined, error: 'Query text cannot be an empty string'},
 
                 // query name
@@ -97,19 +99,28 @@ describe('NOVA.PG-DAO -> Query;', () => {
                 {query: queryText, name: 'a', options: {mask: 'list', mode: 'arr'},  error: queryModeInvalid('arr')},
 
                 // query handler
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: true}, error: notValidHandlerError},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: 123},  error: notValidHandlerError},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: []},   error: notValidHandlerError},
-
+                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: true},          error: notValidHandlerError},
+                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: 123},           error: notValidHandlerError},
+                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: []},            error: notValidHandlerError},
                 {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {}},            error: notValidHandlerError},
                 {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {parse: true}}, error: notValidHandlerError},
                 {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {parse: null}}, error: notValidHandlerError},
                 {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {parse: []}},   error: notValidHandlerError},
             ].forEach(({query, name, options, error}) => {
-                it(`name=${JSON.stringify(name)} and options=${JSON.stringify(options)}`, () => {
+                let title: string;
+
+                if (!query || typeof query !== 'string') {
+                    title = `query='${query}'`;
+                } else if (!name || typeof name !== 'string') {
+                    title = `name=${name}`
+                } else {
+                    title = `options='${JSON.stringify(options)}'`
+                }
+
+                it(title, () => {
                     expect(() => Query.from(query as string, name as any, options as any)).to.throw(TypeError, error);
                 });
-            });
+        });
         });
     });
 
@@ -165,38 +176,153 @@ describe('NOVA.PG-DAO -> Query;', () => {
             });
         });
 
-        describe('should return correct query text  and values for:', () => {
+        describe('should return correct results for template:', () => {
+            const date = new Date('2019-01-15');
+            const buffer = Buffer.from('buffer', 'utf8');
+            const arrFunc = () => 100;
+            const vFunc = () => 100;
+
+            function func () {return 100}
+
+            vFunc.valueOf = () => 100;
+
+            arrFunc.toJSON = () => '() => {}';
+            vFunc.toJSON = () => 'func.valueOf()';
+            func.toJSON = () => 'function() {}';
+
+            const errorTextSection1 = 'Query parameter cannot be a function';
+            const errorTextSection2 = (type: string): string => `Raw query parameter cannot be ${type} value`;
+            const errorTextSection3 = 'Query parameter must be an array';
+            const errorTextSection4 = 'Query parameter must be an array';
+
             [
                 {
                     template: 'SELECT * FROM accounts WHERE id = {{id}}',
                     tests: [
-                        {
-                            params: {id: 124},
-                            result: 'SELECT * FROM accounts WHERE id = 124;\n'
-                        },
-                        {
-                            params: {id: '124'},
-                            result: 'SELECT * FROM accounts WHERE id = \'124\';\n'
-                        },
-                        {
-                            params: {id: true},
-                            result: 'SELECT * FROM accounts WHERE id = true;\n'
-                        }
+                        {id: undefined,     result: 'SELECT * FROM accounts WHERE id = null;\n'},
+                        {id: null,          result: 'SELECT * FROM accounts WHERE id = null;\n'},
+                        {id: 0,             result: 'SELECT * FROM accounts WHERE id = 0;\n'},
+                        {id: 124,           result: 'SELECT * FROM accounts WHERE id = 124;\n'},
+                        {id: true,          result: 'SELECT * FROM accounts WHERE id = true;\n'},
+                        {id: false,         result: 'SELECT * FROM accounts WHERE id = false;\n'},
+                        {id: '124',         result: 'SELECT * FROM accounts WHERE id = \'124\';\n'},
+                        {id: date,          result: `SELECT * FROM accounts WHERE id = '${date.toISOString()}';\n`},
+                        {id: buffer,        result: `SELECT * FROM accounts WHERE id = '${buffer.toString('base64')}';\n`},
+                        {id: [1,2,3,4],     result: 'SELECT * FROM accounts WHERE id = \'[1,2,3,4]\';\n'},
+                        {id: {a: 1},        result: 'SELECT * FROM accounts WHERE id = \'{"a":1}\';\n'},
+                        {id: vFunc,         result: `SELECT * FROM accounts WHERE id = ${vFunc.valueOf()};\n`},
+
+                        {id: '12\'4',       result: 'SELECT * FROM accounts WHERE id = $1;\n', values: ['12\'4']},
+                        {id: '12\\4',       result: 'SELECT * FROM accounts WHERE id = $1;\n', values: ['12\\4']},
+                        {id: [12, '12\'4'], result: 'SELECT * FROM accounts WHERE id = $1;\n', values: [JSON.stringify([12, '12\'4'])]},
+                        {id: {a: '12\'3'},  result: 'SELECT * FROM accounts WHERE id = $1;\n', values: [JSON.stringify({a: '12\'3'})]},
+
+                        {id: arrFunc,       error: errorTextSection1},
+                        {id: func,          error: errorTextSection1}
                     ]
                 },
-                // 'SELECT * FROM accounts WHERE id = {{~id}}',
-                // 'SELECT * FROM accounts WHERE id IN ([[id]])',
-                // 'SELECT * FROM accounts WHERE id IN ([[~id]])',
-                // 'SELECT * FROM accounts WHERE id = {{id}} AND name = {{~id}} AND ids IN ([[id]]) AND names IN ([[~id]])'
-            ].forEach(({template, tests}, index) => {
-                describe(`template='${template}' and params`, () => {
-                    tests.forEach(({params, result}) => {
-                        it(JSON.stringify(params), () => {
-                            const Template = Query.template(template, 'test');
-                            const query = new Template(params);
+                {
+                    template: 'SELECT * FROM accounts WHERE id = {{~id}}',
+                    tests: [
+                        {id: undefined,     result: 'SELECT * FROM accounts WHERE id = null;\n'},
+                        {id: null,          result: 'SELECT * FROM accounts WHERE id = null;\n'},
+                        {id: 0,             result: 'SELECT * FROM accounts WHERE id = 0;\n'},
+                        {id: 124,           result: 'SELECT * FROM accounts WHERE id = 124;\n'},
+                        {id: true,          result: 'SELECT * FROM accounts WHERE id = true;\n'},
+                        {id: false,         result: 'SELECT * FROM accounts WHERE id = false;\n'},
+                        {id: '124',         result: 'SELECT * FROM accounts WHERE id = 124;\n'},
+                        {id: date,          result: `SELECT * FROM accounts WHERE id = ${date.valueOf()};\n`},
+                        {id: vFunc,         result: `SELECT * FROM accounts WHERE id = ${vFunc.valueOf()};\n`},
+                        {id: '12\'4',       result: 'SELECT * FROM accounts WHERE id = 12\'4;\n'},
+                        {id: '12\\4',       result: 'SELECT * FROM accounts WHERE id = 12\\4;\n'},
 
-                            expect(query.text).to.equal(result);
-                            expect(query.values).to.be.undefined;
+                        {id: buffer,        error: errorTextSection2('buffer')},
+                        {id: [1,2,3,4],     error: errorTextSection2('array')},
+                        {id: {a: 1},        error: errorTextSection2('object')},
+                        {id: arrFunc,       error: errorTextSection2('function')},
+                        {id: func,          error: errorTextSection2('function')}
+                    ]
+                },
+                {
+                    template: 'SELECT * FROM accounts WHERE id IN ([[id]])',
+                    tests: [
+                        {id: undefined,     result: 'SELECT * FROM accounts WHERE id IN (null);\n'},
+                        {id: null,          result: 'SELECT * FROM accounts WHERE id IN (null);\n'},
+                        {id: [1,2,3,4],     result: 'SELECT * FROM accounts WHERE id IN (1,2,3,4);\n'},
+
+                        {id: ['1','2\'4'],  result: 'SELECT * FROM accounts WHERE id IN (\'1\',$1);\n', values: ['2\'4']},
+                        {id: ['1','2\\4'],  result: 'SELECT * FROM accounts WHERE id IN (\'1\',$1);\n', values: ['2\\4']},
+
+                        {id: 0,             error: errorTextSection3},
+                        {id: 124,           error: errorTextSection3},
+                        {id: true,          error: errorTextSection3},
+                        {id: false,         error: errorTextSection3},
+                        {id: '124',         error: errorTextSection3},
+                        {id: date,          error: errorTextSection3},
+                        {id: buffer,        error: errorTextSection3},
+                        {id: {a: 1},        error: errorTextSection3},
+                        {id: vFunc,         error: errorTextSection3},
+                        {id: '12\'4',       error: errorTextSection3},
+                        {id: '12\\4',       error: errorTextSection3},
+                        {id: [12, '12\'4'], error: 'Query parameter cannot be an array of mixed values'},
+                        {id: {a: '12\'3'},  error: errorTextSection3},
+                        {id: [{id: 1}],     error: 'Query parameter array cannot contain object values'},
+                        {id: arrFunc,       error: errorTextSection3},
+                        {id: func,          error: errorTextSection3}
+                    ]
+                },
+                {
+                    template: 'SELECT * FROM accounts WHERE id IN ([[~id]])',
+                    tests: [
+                        {id: undefined,     result: 'SELECT * FROM accounts WHERE id IN (null);\n'},
+                        {id: null,          result: 'SELECT * FROM accounts WHERE id IN (null);\n'},
+                        {id: [1,2,3,4],     result: 'SELECT * FROM accounts WHERE id IN (1,2,3,4);\n'},
+
+                        {id: ['1','2\'4'],  result: 'SELECT * FROM accounts WHERE id IN (1,2\'4);\n'},
+                        {id: ['1','2\\4'],  result: 'SELECT * FROM accounts WHERE id IN (1,2\\4);\n'},
+
+                        {id: 0,             error: errorTextSection4},
+                        {id: 124,           error: errorTextSection4},
+                        {id: true,          error: errorTextSection4},
+                        {id: false,         error: errorTextSection4},
+                        {id: '124',         error: errorTextSection4},
+                        {id: date,          error: errorTextSection4},
+                        {id: buffer,        error: errorTextSection4},
+                        {id: {a: 1},        error: errorTextSection4},
+                        {id: vFunc,         error: errorTextSection4},
+                        {id: '12\'4',       error: errorTextSection4},
+                        {id: '12\\4',       error: errorTextSection4},
+                        {id: [12, '12\'4'], error: 'Query parameter cannot be an array of mixed values'},
+                        {id: {a: '12\'3'},  error: errorTextSection4},
+                        {id: [{id: 1}],     error: 'Query parameter array cannot contain object values'},
+                        {id: arrFunc,       error: errorTextSection4},
+                        {id: func,          error: errorTextSection4}
+                    ]
+                }
+            ].forEach(({template, tests}, index) => {
+                describe(template, () => {
+                    tests.forEach((test: any): void => {
+                        const {id, result, values, error} = test;
+                        const title = error
+                            ? `should return error for params=${JSON.stringify({id})}`
+                            : `should create template for params=${JSON.stringify({id})}`;
+
+                        it(title, () => {
+                            const Template = Query.template(template, 'test');
+
+                            if (error) {
+                                expect(() => new Template({id})).to.throw(Error, error);
+                            } else {
+                                const query = new Template({id});
+
+                                expect(query.text).to.equal(result);
+
+                                if (values) {
+                                    expect(query.values).to.deep.equal(values);
+                                } else {
+                                    expect(query.values).to.be.undefined;
+                                }
+                            }
                         });
                     });
                 });

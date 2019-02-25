@@ -1,10 +1,11 @@
 export const settings = {
     connection: {
-        host    : 'localhost',
+        database: 'postgres',
+        host    : '127.0.0.1',
         port    : 5432,
+        ssl     : false,
         user    : 'postgres',
-        password: 'RepT%8&G5l1I',
-        database: 'postgres'
+        password: ''
     },
     pool: {
         maxSize          : 10,

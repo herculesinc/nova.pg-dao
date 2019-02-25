@@ -24,7 +24,7 @@ class Database extends events_1.EventEmitter {
         this.pool = new pg_1.Pool(buildPgPoolOptions(connectionSettings, poolOptions));
         this.pool.on('error', (error) => {
             // turn off error emitter because pgPool emits duplicate errors when client creation fails
-            // this.emit('error', error); 
+            // this.emit('error', error);
         });
     }
     // PUBLIC METHODS
@@ -40,8 +40,8 @@ class Database extends events_1.EventEmitter {
     // --------------------------------------------------------------------------------------------
     getPoolState() {
         return {
-            size: this.pool.pool.totalCount,
-            idle: this.pool.pool.idleCount
+            size: this.pool._clients.length,
+            idle: this.pool._idle.length
         };
     }
 }

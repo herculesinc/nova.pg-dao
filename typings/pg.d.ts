@@ -54,7 +54,9 @@ declare module "pg" {
     }
 
     export class Pool extends events.EventEmitter {
-        pool: any;
+        _clients: Client[];
+        _idle: Client[];
+
         constructor(config: ClientConfig);
 
         connect(): Promise<Client>;
@@ -65,7 +67,7 @@ declare module "pg" {
 
     export class Client extends events.EventEmitter {
         _destroying: boolean;
-        
+
         constructor(connection: string);
         constructor(config: ClientConfig);
 

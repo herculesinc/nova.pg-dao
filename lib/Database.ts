@@ -30,7 +30,7 @@ export class Database extends EventEmitter {
 
         this.pool.on('error', (error) => {
             // turn off error emitter because pgPool emits duplicate errors when client creation fails
-            // this.emit('error', error); 
+            // this.emit('error', error);
         });
     }
 
@@ -49,8 +49,8 @@ export class Database extends EventEmitter {
     // --------------------------------------------------------------------------------------------
     getPoolState(): PoolState {
         return {
-            size    : this.pool.pool.totalCount,
-            idle    : this.pool.pool.idleCount
+            size: this.pool._clients.length,
+            idle: this.pool._idle.length
         };
     }
 }
