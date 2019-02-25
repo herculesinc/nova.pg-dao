@@ -160,7 +160,8 @@ class Command {
             commandId: this.id,
             rowCount: result.rowCount + ''
         };
-        this.logger.trace(this.source, command, endTs - this.start, success, details);
+        const duration = (this.start === undefined) ? 0 : endTs - this.start;
+        this.logger.trace(this.source, command, duration, success, details);
     }
 }
 exports.Command = Command;

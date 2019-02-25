@@ -99,8 +99,13 @@ const database = new Database({
     const query3 = new template1({ profile: `test's` });
     const result3 = session.execute(query3);
 
-    const results = await Promise.all([result1, result2, result3 ]);
-    console.log(JSON.stringify(results));
-    
-    await session.close('commit');
+    try {
+        const results = await Promise.all([result1, result2, result3 ]);
+        console.log(JSON.stringify(results));
+        
+        await session.close('commit');
+    }
+    catch (error) {
+        console.error(error);
+    }
 })();
