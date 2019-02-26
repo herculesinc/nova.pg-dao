@@ -690,37 +690,6 @@ describe('NOVA.PG-DAO -> Session;', () => {
             expect(session.isActive).to.to.be.true;
         });
 
-        it('Query execution error should roll back an active transaction', async () => {
-            await prepareDatabase(session);
-
-            const query1: Query = {
-                text: `UPDATE tmp_users SET username = 'Test' WHERE id = 1;`
-            };
-
-            const result = await session.execute(query1);
-
-            expect(result).to.be.undefined;
-
-            const errorQuery = {
-                text: undefined
-            };
-
-            await expect(session.execute(errorQuery as any)).to.eventually.be.rejectedWith(Error);
-
-            expect(db.getPoolState().size).to.equal(1);
-            expect(db.getPoolState().idle).to.equal(0);
-
-            const query2: SingleResultQuery<User> = {
-                text: 'SELECT * FROM tmp_users WHERE id = 1;',
-                mask: 'single'
-            };
-
-            const user = await session.execute(query2);
-
-            expect(user.id).to.equal(1);
-            expect(user.username).to.equal('Irakliy');
-        });
-
         it('Closing an already closed session should throw an error', async () => {
             await session.close('commit');
 
@@ -761,7 +730,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             expect(db.getPoolState().idle).to.equal(1);
         });
 
-        it('Executing a query with invalid SQL should throw an error and close the session', async () => { // todo rename or fix
+        it('Executing a query with invalid SQL should throw an error', async () => {
             const query: Query = {
                 text: 'SELLECT * FROM tmp_users;'
             };
@@ -774,7 +743,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             expect(session.isActive).to.to.be.true;
         });
 
-        it('Executing a query with invalid result parser should throw an error and close the session', async () => { // todo rename or fix
+        it('Executing a query with invalid result parser should throw an error', async () => {
             const query: ListResultQuery<User> = {
                 text: 'SELECT * FROM tmp_users WHERE id = 1;',
                 mask: 'list',
@@ -793,7 +762,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             expect(session.isActive).to.to.be.true;
         });
 
-        it('Attempt to connect to a non-existing database should throw an error', async () => { //todo
+        it('Attempt to connect to a non-existing database should throw an error', async () => {
             const settings1 = JSON.parse(JSON.stringify(settings));
 
             settings1.connection.database = 'invalid';
