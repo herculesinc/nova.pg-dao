@@ -51,9 +51,9 @@ export namespace Query {
     export function template<T=any>(text: string, name: string, mask: 'single'): QueryTemplate<SingleResultQuery<T>>
     export function template<T=any>(text: string, name: string, options: SingleResultQueryOptions<T>): QueryTemplate<SingleResultQuery<T>>
     export function template<T=any>(text: string, options: SingleResultQueryOptions<T>): QueryTemplate<SingleResultQuery<T>>
-    export function template<T=any>(text: string, nameOrOptions?: string | ResultQueryOptions<T>): QueryTemplate<any> {
+    export function template<T=any>(text: string, nameOrOptions?: string | ResultQueryOptions<T>, maskOrOptions?: QueryMask | ResultQueryOptions<T>): QueryTemplate<any> {
 
-        const validated = validateQueryArguments(text, nameOrOptions);
+        const validated = validateQueryArguments(text, nameOrOptions, maskOrOptions);
         const textParts = validated.text.split(PARAM_PATTERN);
         if (textParts.length < 2) throw new QueryError('Query text must contain at least one parameter');
 
@@ -168,7 +168,7 @@ function stringifyRawSingleParam(value: any, values: string[]) {
 }
                 case 'boolean': {
                     return pvalue.toString();
-                }                
+                }
                 default: {
                     throw new Error(`Raw query parameter cannot be reduced to a primitive value`);
                 }
@@ -347,7 +347,7 @@ function validateQueryOptions(options: ResultQueryOptions, checkName: boolean) {
             if (name === '') throw new TypeError('Query name must be a non-empty string');
         }
         else if (options.name === undefined) {
-            name = 'unnamed query';    
+            name = 'unnamed query';
         }
         else {
             throw new TypeError('Query name must be a string');

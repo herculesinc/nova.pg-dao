@@ -14,8 +14,8 @@ var Query;
         return validateQueryArguments(text, nameOrOptions, maskOrOptions);
     }
     Query.from = from;
-    function template(text, nameOrOptions) {
-        const validated = validateQueryArguments(text, nameOrOptions);
+    function template(text, nameOrOptions, maskOrOptions) {
+        const validated = validateQueryArguments(text, nameOrOptions, maskOrOptions);
         const textParts = validated.text.split(PARAM_PATTERN);
         if (textParts.length < 2)
             throw new errors_1.QueryError('Query text must contain at least one parameter');

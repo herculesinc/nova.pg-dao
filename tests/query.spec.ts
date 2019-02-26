@@ -8,7 +8,10 @@ function extractId(row: any): string {
 
 extractId.toJSON = () => 'extractIdFn';
 
-describe('NOVA.PG-DAO -> Query;', () => {
+describe.only('NOVA.PG-DAO -> Query;', () => {
+    (Object as any).toJSON = () => 'Object';
+    (Array as any).toJSON = () => 'Array';
+
     describe('\'Query.from()\' method;', () => {
         const queryText1 = 'SELECT * FROM accounts WHERE id = 123';
         const queryText2 = 'SELECT * FROM accounts WHERE id = 321;';
@@ -17,13 +20,22 @@ describe('NOVA.PG-DAO -> Query;', () => {
             [
                 {text: queryText1, name: undefined, options: undefined},
                 {text: queryText1, name: 'a',       options: {mask: 'list'}},
-                {text: queryText2, name: 'ab',      options: {mask: 'single', mode: 'array'}},
+                {text: queryText1, name: 'a',       mask: 'list'},
+                {text: queryText2, name: 'ab',      options: {mask: 'single'}},
                 {text: queryText2, name: 'abc',     options: {mask: 'single', handler: {parse: extractId}}},
-                {text: queryText2, name: 'a',       options: {mask: 'single', mode: 'object', handler: {parse: extractId}}},
-                {text: queryText2, name: undefined, options: {mask: 'single', mode: 'object', handler: {parse: extractId}}}
-            ].forEach(({text, name, options}) => {
-                it(`name=${JSON.stringify(name)} and options=${JSON.stringify(options)}`, () => {
-                    const query = Query.from(text, (name || options) as any, (name ? options : undefined) as any);
+                {text: queryText2, name: 'a',       options: {mask: 'single', handler: {parse: extractId}}},
+                {text: queryText2, name: undefined, options: {mask: 'single', handler: {parse: extractId}}},
+                {text: queryText2, name: undefined, options: {mask: 'single', handler: Object}},
+                {text: queryText2, name: undefined, options: {mask: 'list',   handler: Array}}
+            ].forEach(({text, name, mask, options}) => {
+                const title = mask
+                    ? `name=${JSON.stringify(name)} and mask='${mask}'`
+                    : `name=${JSON.stringify(name)} and options=${JSON.stringify(options)}`;
+
+                it(title, () => {
+                    const [nameOrOptions, maskOrOptions] = formQueryParams(name, mask, options);
+
+                    const query = Query.from(text, nameOrOptions, maskOrOptions);
 
                     expect(query).to.not.be.undefined;
 
@@ -36,6 +48,8 @@ describe('NOVA.PG-DAO -> Query;', () => {
                     // mask
                     if (options) {
                         expect(query.mask).to.equal(options.mask);
+                    } else if (mask) {
+                        expect(query.mask).to.equal(mask);
                     } else {
                         expect(query.mask).to.be.undefined;
                     }
@@ -43,6 +57,9 @@ describe('NOVA.PG-DAO -> Query;', () => {
                     // handler
                     if (options && options.handler) {
                         expect(query.handler).to.equal(options.handler);
+                    } else if (options) {
+                        expect(query.handler).to.not.be.undefined;
+                        expect(query.handler).to.equal(Object);
                     } else {
                         expect(query.handler).to.be.undefined;
                     }
@@ -58,7 +75,6 @@ describe('NOVA.PG-DAO -> Query;', () => {
 
             const notStringQueryTextError = 'Query text must be a string';
             const queryMaskInvalid = (mask: any): string => `Query mask '${mask}' is invalid`;
-            const queryModeInvalid = (mode: any): string => `Query mode '${mode}' is invalid`;
             const notValidHandlerError= 'Query handler is invalid';
 
             [
@@ -83,22 +99,14 @@ describe('NOVA.PG-DAO -> Query;', () => {
                 {query: queryText, name: 'a', options: {mask: {}},     error: queryMaskInvalid('{}')},
                 {query: queryText, name: 'a', options: {mask: []},     error: queryMaskInvalid('[]')},
 
-                // query mode
-                {query: queryText, name: 'a', options: {mask: 'list', mode: null},   error: queryModeInvalid(null)},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 123},    error: queryModeInvalid(123)},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: {}},     error: queryModeInvalid('{}')},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: []},     error: queryModeInvalid('[]')},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'test'}, error: queryModeInvalid('test')},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'arr'},  error: queryModeInvalid('arr')},
-
                 // query handler
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: true},          error: notValidHandlerError},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: 123},           error: notValidHandlerError},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: []},            error: notValidHandlerError},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {}},            error: notValidHandlerError},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {parse: true}}, error: notValidHandlerError},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {parse: null}}, error: notValidHandlerError},
-                {query: queryText, name: 'a', options: {mask: 'list', mode: 'array', handler: {parse: []}},   error: notValidHandlerError},
+                {query: queryText, name: 'a', options: {mask: 'list', handler: true},          error: notValidHandlerError},
+                {query: queryText, name: 'a', options: {mask: 'list', handler: 123},           error: notValidHandlerError},
+                {query: queryText, name: 'a', options: {mask: 'list', handler: []},            error: notValidHandlerError},
+                {query: queryText, name: 'a', options: {mask: 'list', handler: {}},            error: notValidHandlerError},
+                {query: queryText, name: 'a', options: {mask: 'list', handler: {parse: true}}, error: notValidHandlerError},
+                {query: queryText, name: 'a', options: {mask: 'list', handler: {parse: null}}, error: notValidHandlerError},
+                {query: queryText, name: 'a', options: {mask: 'list', handler: {parse: []}},   error: notValidHandlerError},
             ].forEach(({query, name, options, error}) => {
                 let title: string;
 
@@ -113,7 +121,7 @@ describe('NOVA.PG-DAO -> Query;', () => {
                 it(title, () => {
                     expect(() => Query.from(query as string, name as any, options as any)).to.throw(TypeError, error);
                 });
-        });
+            });
         });
     });
 
@@ -125,13 +133,23 @@ describe('NOVA.PG-DAO -> Query;', () => {
             [
                 {name: undefined, options: undefined},
                 {name: 'a',       options: {mask: 'list'}},
-                {name: 'ab',      options: {mask: 'single', mode: 'array'}},
+                {name: 'a',       mask: 'list'},
+                {name: 'ab',      options: {mask: 'single'}},
+                {name: 'ab',      mask: 'single'},
                 {name: 'abc',     options: {mask: 'single', handler: {parse: extractId}}},
-                {name: 'a',       options: {mask: 'single', mode: 'object', handler: {parse: extractId}}},
-                {name: undefined, options: {mask: 'single', mode: 'object', handler: {parse: extractId}}}
-            ].forEach(({name, options}) => {
-                it(`name=${JSON.stringify(name)} and options=${JSON.stringify(options)}`, () => {
-                    const Template = Query.template(queryTemplate, (name || options) as any, (name ? options : undefined) as any);
+                {name: 'a',       options: {mask: 'single', handler: {parse: extractId}}},
+                {name: undefined, options: {mask: 'single', handler: {parse: extractId}}},
+                {name: undefined, options: {mask: 'single', handler: Object}},
+                {name: undefined, options: {mask: 'single', handler: Array}}
+            ].forEach(({name, mask, options}) => {
+                const title = mask
+                    ? `name=${JSON.stringify(name)} and mask='${mask}'`
+                    : `name=${JSON.stringify(name)} and options=${JSON.stringify(options)}`;
+
+                it(title, () => {
+                    const [nameOrOptions, maskOrOptions] = formQueryParams(name, mask, options);
+
+                    const Template = Query.template(queryTemplate, nameOrOptions, maskOrOptions);
                     const query = new Template({id: 1});
 
                     expect(query).to.not.be.undefined;
@@ -145,6 +163,8 @@ describe('NOVA.PG-DAO -> Query;', () => {
                     // mask
                     if (options) {
                         expect(query.mask).to.equal(options.mask);
+                    } else if (mask) {
+                        expect(query.mask).to.equal(mask);
                     } else {
                         expect(query.mask).to.be.undefined;
                     }
@@ -152,6 +172,9 @@ describe('NOVA.PG-DAO -> Query;', () => {
                     // handler
                     if (options && options.handler) {
                         expect(query.handler).to.equal(options.handler);
+                    } else if (options) {
+                        expect(query.handler).to.not.be.undefined;
+                        expect(query.handler).to.equal(Object);
                     } else {
                         expect(query.handler).to.be.undefined;
                     }
@@ -316,3 +339,18 @@ describe('NOVA.PG-DAO -> Query;', () => {
         });
     });
 });
+
+// helpers
+function formQueryParams(name: any, mask: any, options: any) {
+    let nameOrOptions: any;
+    let maskOrOptions: any;
+
+    if (name) {
+        nameOrOptions = name;
+        maskOrOptions = mask || options;
+    } else if (options) {
+        nameOrOptions = options;
+    }
+
+    return [nameOrOptions, maskOrOptions];
+}
