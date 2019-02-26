@@ -3,13 +3,12 @@
 import { FieldDescriptor, Query, SelectAllModelsQuery, SelectOneModelQuery, IdGenerator, FieldMap, QueryMask } from '@nova/pg-dao';
 import { DbSchema, DbField, SelectModelQuery, InsertModelQuery, UpdateModelQuery, DeleteModelQuery, queries } from './schema';
 import { ModelError } from './errors';
-import { DaoSession } from './Session';
 
 // MODULE VARIABLES
 // ================================================================================================
-export const symDeleted = Symbol();
-export const symCreated = Symbol();
-export const symMutable = Symbol();
+export const symDeleted = Symbol('deleted');
+export const symCreated = Symbol('created');
+export const symMutable = Symbol('mutable');
 
 const symOriginal = Symbol();
 
@@ -54,18 +53,43 @@ export class Model {
 
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(seed: string[] | object, fields: FieldDescriptor[]) {
+    constructor(seed: string[] | object, fieldsOrClone: FieldDescriptor[] | boolean) {
         if (!seed) throw new TypeError('Model seed is undefined');
 
         if (Array.isArray(seed)) {
-            if (!fields) throw new TypeError('Models fields are undefined');
-            if (!Array.isArray(fields)) throw new TypeError('Model fields are invalid');
-            this.infuse(seed, fields);
+            // the model is being built from database row
+            if (!fieldsOrClone) throw new TypeError('Models fields are undefined');
+            if (!Array.isArray(fieldsOrClone)) throw new TypeError('Model fields are invalid');
+            this.infuse(seed, fieldsOrClone);
         }
         else {
-            // TODO: build model
+            // the model is being built from an object
+            if (typeof seed !== 'object') throw new TypeError('Model seed is invalid');
+            const clone = (fieldsOrClone === undefined) ? false: fieldsOrClone;
+            if (typeof clone !== 'boolean') throw new TypeError('Clone flag is invalid');
+
+            const schema = (this.constructor as typeof Model).getSchema();
+            if (clone) {
+                // make a deep copy of the seed
+                for (let field of schema.fields) {
+                    let fieldName = field.name as keyof this;
+                    let seedValue = (seed as any)[fieldName];
+                    this[fieldName] = field.clone ? field.clone(seedValue) : seedValue;
+                }
+            }
+            else {
+                // make a shallow copy of the seed
+                for (let field of schema.fields) {
+                    this[field.name as keyof this] = (seed as any)[field.name];
+                }
+            }
         }
 
+        // validate required fields
+        if (!this.id) throw new ModelError('Model ID is undefined');
+        if (!this.createdOn) throw new ModelError('Model createdOn is undefined');
+        if (!this.updatedOn) throw new ModelError('Model updatedOn is undefined');
+        
         // initialize internal state
         this[symMutable] = false;
         this[symCreated] = false;
@@ -85,10 +109,10 @@ export class Model {
             return this.qSelectOneModel;
         }
         else if (mask === 'list') {
-            return this.qSelectOneModel;
+            return this.qSelectAllModels;
         }
         else {
-            // TODO: throw error
+            throw new TypeError(`Cannot get SelectQuery template for ${this.name} model: mask '${mask}' is invalid`)
         }
     }
 

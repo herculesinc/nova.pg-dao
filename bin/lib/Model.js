@@ -4,9 +4,9 @@ const schema_1 = require("./schema");
 const errors_1 = require("./errors");
 // MODULE VARIABLES
 // ================================================================================================
-exports.symDeleted = Symbol();
-exports.symCreated = Symbol();
-exports.symMutable = Symbol();
+exports.symDeleted = Symbol('deleted');
+exports.symCreated = Symbol('created');
+exports.symMutable = Symbol('mutable');
 const symOriginal = Symbol();
 // PUBLIC FUNCTIONS
 // ================================================================================================
@@ -33,19 +33,47 @@ exports.isModelClass = isModelClass;
 class Model {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(seed, fields) {
+    constructor(seed, fieldsOrClone) {
         if (!seed)
             throw new TypeError('Model seed is undefined');
         if (Array.isArray(seed)) {
-            if (!fields)
+            // the model is being built from database row
+            if (!fieldsOrClone)
                 throw new TypeError('Models fields are undefined');
-            if (!Array.isArray(fields))
+            if (!Array.isArray(fieldsOrClone))
                 throw new TypeError('Model fields are invalid');
-            this.infuse(seed, fields);
+            this.infuse(seed, fieldsOrClone);
         }
         else {
-            // TODO: build model
+            // the model is being built from an object
+            if (typeof seed !== 'object')
+                throw new TypeError('Model seed is invalid');
+            const clone = (fieldsOrClone === undefined) ? false : fieldsOrClone;
+            if (typeof clone !== 'boolean')
+                throw new TypeError('Clone flag is invalid');
+            const schema = this.constructor.getSchema();
+            if (clone) {
+                // make a deep copy of the seed
+                for (let field of schema.fields) {
+                    let fieldName = field.name;
+                    let seedValue = seed[fieldName];
+                    this[fieldName] = field.clone ? field.clone(seedValue) : seedValue;
+                }
+            }
+            else {
+                // make a shallow copy of the seed
+                for (let field of schema.fields) {
+                    this[field.name] = seed[field.name];
+                }
+            }
         }
+        // validate required fields
+        if (!this.id)
+            throw new errors_1.ModelError('Model ID is undefined');
+        if (!this.createdOn)
+            throw new errors_1.ModelError('Model createdOn is undefined');
+        if (!this.updatedOn)
+            throw new errors_1.ModelError('Model updatedOn is undefined');
         // initialize internal state
         this[exports.symMutable] = false;
         this[exports.symCreated] = false;
@@ -61,10 +89,10 @@ class Model {
             return this.qSelectOneModel;
         }
         else if (mask === 'list') {
-            return this.qSelectOneModel;
+            return this.qSelectAllModels;
         }
         else {
-            // TODO: throw error
+            throw new TypeError(`Cannot get SelectQuery template for ${this.name} model: mask '${mask}' is invalid`);
         }
     }
     static setSchema(tableName, idGenerator, fields) {

@@ -60,7 +60,7 @@ export function buildSelectQueryClass(schema: DbSchema, mask: QueryMask, handler
         }
 
         get text(): string {
-            return `SELECT ${this.select} FROM ${this.from} WHERE ${this.where} ${ this.mutable ? 'FOR UPDATE' : ''};`;
+            return `SELECT ${this.select} FROM ${this.from} WHERE ${this.where}${ this.mutable ? ' FOR UPDATE' : ''};`;
         }
 
         get values(): any[] | undefined {
@@ -147,7 +147,7 @@ function buildSelectText(schema: DbSchema): string {
         }
     }
 
-    return fieldGetters.join(',');
+    return fieldGetters.join(', ');
 }
 
 function buildWhereText(schema: DbSchema, selector: any, values: any[]): string {

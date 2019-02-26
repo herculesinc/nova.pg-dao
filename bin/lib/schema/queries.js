@@ -22,7 +22,7 @@ function buildSelectQueryClass(schema, mask, handler) {
             }
         }
         get text() {
-            return `SELECT ${this.select} FROM ${this.from} WHERE ${this.where} ${this.mutable ? 'FOR UPDATE' : ''};`;
+            return `SELECT ${this.select} FROM ${this.from} WHERE ${this.where}${this.mutable ? ' FOR UPDATE' : ''};`;
         }
         get values() {
             return (this.paramValues.length > 0) ? this.paramValues : undefined;
@@ -94,7 +94,7 @@ function buildSelectText(schema) {
             fieldGetters.push(`${field.snakeName} AS "${field.name}"`);
         }
     }
-    return fieldGetters.join(',');
+    return fieldGetters.join(', ');
 }
 function buildWhereText(schema, selector, values) {
     const criteria = [];

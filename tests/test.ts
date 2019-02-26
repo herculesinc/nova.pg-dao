@@ -1,7 +1,10 @@
 // IMPORTS
 // ================================================================================================
 import { Database, Query } from '../index';
-import { ListResultQueryOptions, SingleResultQueryOptions, ResultHandler } from '@nova/pg-dao';
+import { ListResultQueryOptions, SingleResultQueryOptions, ResultHandler, FieldHandler } from '@nova/pg-dao';
+import { Model } from '../lib/Model';
+import { dbModel, dbField } from '../lib/schema/decorators';
+import { PgIdGenerator } from '../lib/schema/idGenerators';
 
 // MODULE VARIABLES
 // ================================================================================================
@@ -72,6 +75,36 @@ function extractId(row: any): string {
     console.log(JSON.stringify(query8));
 });
 
+// MODEL TESTS
+// ================================================================================================
+interface Password {
+    value: string;
+}
+
+const Password: FieldHandler = {
+    clone(pwd: Password) { return pwd; },
+    areEqual(pwd1: Password, pwd2: Password) { return pwd1 === pwd2; }
+};
+
+@dbModel('accounts', new PgIdGenerator('accounts_seq'))
+class Account extends Model {
+
+    @dbField(String)
+    username!: string;
+
+    @dbField(Object, { handler: Password })
+    password!: Password;
+}
+
+(function modelTests() {
+
+    console.log(JSON.stringify(Account.getSchema()));
+    const qSelectAccounts = Account.SelectQuery('list');
+    console.log(new qSelectAccounts(false, { id: '123' }).text);
+    console.log(new qSelectAccounts(true,  { id: '234' }).text);
+
+})();
+
 // DATABASE TESTS
 // ================================================================================================
 const database = new Database({
@@ -108,4 +141,4 @@ const database = new Database({
     catch (error) {
         console.error(error);
     }
-})();
+});
