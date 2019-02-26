@@ -1,6 +1,4 @@
-﻿// IMPORTS
-// ================================================================================================
-import * as chai from 'chai';
+﻿import * as chai from 'chai';
 import * as chaiAsPromised from 'chai-as-promised';
 
 chai.use(chaiAsPromised);
@@ -25,7 +23,7 @@ const options: SessionOptions = {
 
 const logger = new MockLogger();
 
-describe.only('NOVA.PG-DAO -> Session;', () => {
+describe('NOVA.PG-DAO -> Session;', () => {
     describe('Query tests;', () => {
         beforeEach(async () => {
             db = new Database(settings);
@@ -664,7 +662,7 @@ describe.only('NOVA.PG-DAO -> Session;', () => {
         });
     });
 
-    describe.only('Error condition tests;', () => {
+    describe('Error condition tests;', () => {
         beforeEach(async () => {
             db = new Database(settings);
             session = db.getSession(options, logger);
