@@ -31,9 +31,11 @@
   },
   "devDependencies": {
     "@types/chai": "4.1.x",
+    "@types/chai-as-promised": "^7.1.0",
     "@types/mocha": "5.2.x",
     "@types/node": "10.12.x",
     "chai": "4.2.x",
+    "chai-as-promised": "7.1.x",
     "del": "3.0.x",
     "gulp": "4.0.x",
     "gulp-mocha": "6.0.x",

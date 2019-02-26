@@ -1,8 +1,14 @@
 ﻿// IMPORTS
 // ================================================================================================
-import { expect } from 'chai';
+import * as chai from 'chai';
+import * as chaiAsPromised from 'chai-as-promised';
+
+chai.use(chaiAsPromised);
+
+const expect = chai.expect;
+
 import { Database } from './../index';
-import { ListResultQuery, SingleResultQuery, SessionOptions } from '@nova/pg-dao';
+import { ListResultQuery, SingleResultQuery, SessionOptions, PoolState } from '@nova/pg-dao';
 import { Query } from '../index';
 import { DaoSession } from '../lib/Session';
 import { User, prepareDatabase } from './setup';
@@ -19,9 +25,8 @@ const options: SessionOptions = {
 
 const logger = new MockLogger();
 
-describe('NOVA.PG-DAO -> Session;', () => {
+describe.only('NOVA.PG-DAO -> Session;', () => {
     describe('Query tests;', () => {
-
         beforeEach(async () => {
             db = new Database(settings);
             session = db.getSession(options, logger);
@@ -370,119 +375,96 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
         });
 
-        // describe('Mixed query tests;', function () {
-        //
-        //     it('Multiple mixed queries should produce a Map of results', () => {
-        //         return new Database(settings).connect().then((session) => {
-        //             return prepareDatabase(session).then(() => {
-        //                 const query1: SingleResultQuery<User> = {
-        //                     text: 'SELECT * FROM tmp_users WHERE id = 2;',
-        //                     mask: 'single',
-        //                     name: 'query1'
-        //                 };
-        //
-        //                 const query2: ListResultQuery<User> = {
-        //                     text: 'SELECT * FROM tmp_users WHERE id IN (1, 3);',
-        //                     mask: 'list',
-        //                     name: 'query2'
-        //                 };
-        //                 return session.execute([query1, query2]).then((results) => {
-        //                     assert.strictEqual(results.size, 2);
-        //
-        //                     const user = results.get(query1.name);
-        //                     assert.strictEqual(user.id, 2);
-        //                     assert.strictEqual(user.username, 'Yason');
-        //
-        //                     const users = results.get(query2.name);
-        //                     assert.strictEqual(users.length, 2);
-        //                     assert.strictEqual(users[0].id, 1);
-        //                     assert.strictEqual(users[0].username, 'Irakliy');
-        //                     assert.strictEqual(users[1].id, 3);
-        //                     assert.strictEqual(users[1].username, 'George');
-        //                 });
-        //             }).then(() => session.close());
-        //         });
-        //     });
-        //
-        //     it('Unnamed mixed queries should aggregate into undefined key', () => {
-        //         return new Database(settings).connect().then((session) => {
-        //             return prepareDatabase(session).then(() => {
-        //                 const query1: SingleResultQuery<{ id: number, username: string }> = {
-        //                     text: 'SELECT id, username FROM tmp_users WHERE id = 1;',
-        //                     mask: 'single'
-        //                 };
-        //
-        //                 const query2: ListResultQuery<{ id: number, username: string }> = {
-        //                     text: 'SELECT id, username FROM tmp_users WHERE id IN (2, 3);',
-        //                     mask: 'list'
-        //                 };
-        //
-        //                 const query3: ListResultQuery<{ id: number, username: string }> = {
-        //                     text: 'SELECT id, username FROM tmp_users WHERE id IN (2, 3);',
-        //                     mask: 'list',
-        //                     name: 'test'
-        //                 };
-        //
-        //                 return session.execute([query1, query2, query3]).then((results) => {
-        //                     assert.strictEqual(results.size, 2);
-        //                     const result = results.get(undefined);
-        //                     const user = result[0];
-        //                     assert.strictEqual(user.id, 1);
-        //                     assert.strictEqual(user.username, 'Irakliy');
-        //
-        //                     const users = result[1];
-        //                     assert.strictEqual(users.length, 2);
-        //                     assert.strictEqual(users[0].id, 2);
-        //                     assert.strictEqual(users[0].username, 'Yason');
-        //                     assert.strictEqual(users[1].id, 3);
-        //                     assert.strictEqual(users[1].username, 'George');
-        //                 });
-        //             }).then(() => session.close());
-        //         });
-        //     });
-        //
-        //     it('Unnamed non-result queries should not produce holes in result array', () => {
-        //         return new Database(settings).connect().then((session) => {
-        //             return prepareDatabase(session).then(() => {
-        //                 const query1: SingleResultQuery<{ id: number, username: string }> = {
-        //                     text: 'SELECT id, username FROM tmp_users WHERE id = 1;',
-        //                     mask: 'single'
-        //                 };
-        //
-        //                 const query2: Query = {
-        //                     text: `UPDATE tmp_users SET username = 'irakliy' WHERE username = 'irakliy';`
-        //                 };
-        //
-        //                 const query3: ListResultQuery<{ id: number, username: string }> = {
-        //                     text: 'SELECT id, username FROM tmp_users WHERE id IN (2, 3);',
-        //                     mask: 'list'
-        //                 };
-        //
-        //                 const query4: ListResultQuery<{ id: number, username: string }> = {
-        //                     text: 'SELECT id, username FROM tmp_users WHERE id IN (2, 3);',
-        //                     mask: 'list',
-        //                     name: 'test'
-        //                 };
-        //
-        //                 return session.execute([query1, query2, query3, query4]).then((results) => {
-        //                     assert.strictEqual(results.size, 2);
-        //                     const result = results.get(undefined);
-        //                     const user = result[0];
-        //                     assert.strictEqual(user.id, 1);
-        //                     assert.strictEqual(user.username, 'Irakliy');
-        //
-        //                     const users = result[1];
-        //                     assert.strictEqual(users.length, 2);
-        //                     assert.strictEqual(users[0].id, 2);
-        //                     assert.strictEqual(users[0].username, 'Yason');
-        //                     assert.strictEqual(users[1].id, 3);
-        //                     assert.strictEqual(users[1].username, 'George');
-        //                 });
-        //             }).then(() => session.close());
-        //         });
-        //     });
-        // });
-        //
+        describe('Mixed query tests;', () => {
+            it('Multiple mixed queries should produce a Map of results', async () => {
+                const query1: SingleResultQuery<User> = {
+                    text: 'SELECT * FROM tmp_users WHERE id = 2;',
+                    mask: 'single',
+                    name: 'query1'
+                };
+
+                const query2: ListResultQuery<User> = {
+                    text: 'SELECT * FROM tmp_users WHERE id IN (1, 3);',
+                    mask: 'list',
+                    name: 'query2'
+                };
+
+                const [result1, result2] = await Promise.all([session.execute(query1), session.execute(query2)]);
+
+                expect(result1.id).to.equal(2);
+
+                expect(result2).to.have.length(2);
+                expect(result2[0].id).to.equal(1);
+                expect(result2[1].id).to.equal(3);
+            });
+
+            it('Unnamed mixed queries should aggregate into undefined key', async () => { // todo rename
+                const query1: SingleResultQuery<{ id: number, username: string }> = {
+                    text: 'SELECT id, username FROM tmp_users WHERE id = 1;',
+                    mask: 'single'
+                };
+
+                const query2: ListResultQuery<{ id: number, username: string }> = {
+                    text: 'SELECT id, username FROM tmp_users WHERE id IN (2, 3);',
+                    mask: 'list'
+                };
+
+                const query3: ListResultQuery<{ id: number, username: string }> = {
+                    text: 'SELECT id, username FROM tmp_users WHERE id IN (2, 3);',
+                    mask: 'list',
+                    name: 'test'
+                };
+
+                const [result1, result2, result3] = await Promise.all([session.execute(query1), session.execute(query2), session.execute(query3)]);
+
+                expect(result1.id).to.equal(1);
+
+                expect(result2).to.have.length(2);
+                expect(result2[0].id).to.equal(2);
+                expect(result2[1].id).to.equal(3);
+
+                expect(result3).to.have.length(2);
+                expect(result3[0].id).to.equal(2);
+                expect(result3[1].id).to.equal(3);
+            });
+
+            it('Unnamed non-result queries should not produce holes in result array', async () => {
+                const query1: SingleResultQuery<{ id: number, username: string }> = {
+                    text: 'SELECT id, username FROM tmp_users WHERE id = 1;',
+                    mask: 'single'
+                };
+
+                const query2: Query = {
+                    text: `UPDATE tmp_users SET username = 'irakliy' WHERE username = 'irakliy';`
+                };
+
+                const query3: ListResultQuery<{ id: number, username: string }> = {
+                    text: 'SELECT id, username FROM tmp_users WHERE id IN (2, 3);',
+                    mask: 'list'
+                };
+
+                const query4: ListResultQuery<{ id: number, username: string }> = {
+                    text: 'SELECT id, username FROM tmp_users WHERE id IN (2, 3);',
+                    mask: 'list',
+                    name: 'test'
+                };
+
+                const [result1, result2, result3, result4] = await Promise.all([session.execute(query1), session.execute(query2), session.execute(query3), session.execute(query4)]);
+
+                expect(result1.id).to.equal(1);
+
+                expect(result2).to.be.undefined;
+
+                expect(result3).to.have.length(2);
+                expect(result3[0].id).to.equal(2);
+                expect(result3[1].id).to.equal(3);
+
+                expect(result4).to.have.length(2);
+                expect(result4[0].id).to.equal(2);
+                expect(result4[1].id).to.equal(3);
+            });
+        });
+
         describe('Parametrized query tests;', () => {
             it('Object query parametrized with number should retrieve correct row', async () => {
                 const Template = Query.template('SELECT * FROM tmp_users WHERE id = {{id}};', {mask: 'single'});
@@ -514,531 +496,324 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(user.username).to.equal('T\'est');
             });
 
-            //     it('Mix of parametrized and non-parametrized queries should return correct result map', () => {
-            //         return new Database(settings).connect().then((session) => {
-            //             return prepareDatabase(session).then(() => {
-            //                 const query1: SingleResultQuery<User> = {
-            //                     text: 'SELECT * FROM tmp_users WHERE id = 1;',
-            //                     mask: 'single',
-            //                     name: 'query1'
-            //                 };
-            //
-            //                 const query2: SingleResultQuery<User> = {
-            //                     text: 'SELECT * FROM tmp_users WHERE id = 2;',
-            //                     mask: 'single',
-            //                     name: 'query2'
-            //                 };
-            //
-            //                 const query3: SingleResultQuery<User> = {
-            //                     text: 'SELECT * FROM tmp_users WHERE username = {{username}};',
-            //                     mask: 'single',
-            //                     name: 'query3',
-            //                     params: {
-            //                         username: `T'est`
-            //                     }
-            //                 };
-            //
-            //                 const query4: SingleResultQuery<User> = {
-            //                     text: 'SELECT * FROM tmp_users WHERE id = 3;',
-            //                     mask: 'single',
-            //                     name: 'query4'
-            //                 };
-            //
-            //                 return session.execute([query1, query2, query3, query4]).then((results) => {
-            //                     assert.strictEqual(results.size, 4);
-            //
-            //                     const user1 = results.get(query1.name);
-            //                     assert.strictEqual(user1.id, 1);
-            //                     assert.strictEqual(user1.username, 'Irakliy');
-            //
-            //                     const user2 = results.get(query2.name);
-            //                     assert.strictEqual(user2.id, 2);
-            //                     assert.strictEqual(user2.username, 'Yason');
-            //
-            //                     const user3 = results.get(query3.name);
-            //                     assert.strictEqual(user3.id, 4);
-            //                     assert.strictEqual(user3.username, `T'est`);
-            //
-            //                     const user4 = results.get(query4.name);
-            //                     assert.strictEqual(user4.id, 3);
-            //                     assert.strictEqual(user4.username, `George`);
-            //                 });
-            //             }).then(() => session.close());
-            //         });
-            //     });
-            //
-            //     it('Two parametrized queries in a row should produce correct result', () => {
-            //         return new Database(settings).connect().then((session) => {
-            //             return prepareDatabase(session).then(() => {
-            //                 const query1: SingleResultQuery<User> = {
-            //                     text: 'SELECT * FROM tmp_users WHERE id = 1;',
-            //                     mask: 'single',
-            //                     name: 'query1'
-            //                 };
-            //
-            //                 const query2: SingleResultQuery<User> = {
-            //                     text: 'SELECT * FROM tmp_users WHERE username = {{username}};',
-            //                     mask: 'single',
-            //                     name: 'query2',
-            //                     params: {
-            //                         username: `T'est`
-            //                     }
-            //                 };
-            //
-            //                 const query3: SingleResultQuery<User> = {
-            //                     text: 'SELECT * FROM tmp_users WHERE id = {{id}};',
-            //                     mask: 'single',
-            //                     name: 'query3',
-            //                     params: {
-            //                         id: 2
-            //                     }
-            //                 };
-            //
-            //                 const query4: SingleResultQuery<User> = {
-            //                     text: 'SELECT * FROM tmp_users WHERE id = 3;',
-            //                     mask: 'single',
-            //                     name: 'query4'
-            //                 };
-            //
-            //                 return session.execute([query1, query2, query3, query4]).then((results) => {
-            //                     assert.strictEqual(results.size, 4);
-            //
-            //                     const user1 = results.get(query1.name);
-            //                     assert.strictEqual(user1.id, 1);
-            //                     assert.strictEqual(user1.username, 'Irakliy');
-            //
-            //                     const user2 = results.get(query2.name);
-            //                     assert.strictEqual(user2.id, 4);
-            //                     assert.strictEqual(user2.username, `T'est`);
-            //
-            //                     const user3 = results.get(query3.name);
-            //                     assert.strictEqual(user3.id, 2);
-            //                     assert.strictEqual(user3.username, 'Yason');
-            //
-            //                     const user4 = results.get(query4.name);
-            //                     assert.strictEqual(user4.id, 3);
-            //                     assert.strictEqual(user4.username, `George`);
-            //                 });
-            //             }).then(() => session.close());
-            //         });
-            //     });
-        });
+            it('Mix of parametrized and non-parametrized queries should return correct result map', async () => {
+                const query1: SingleResultQuery<User> = {
+                    text: 'SELECT * FROM tmp_users WHERE id = 1;',
+                    mask: 'single',
+                    name: 'query1'
+                };
 
-        describe('Session lifecycle tests;', () => {
-            it('Closing a session should return a connection back to the pool', () => {
-                const database = new Database(settings);
-                const poolState = database.getPoolState();
+                const query2: SingleResultQuery<User> = {
+                    text: 'SELECT * FROM tmp_users WHERE id = 2;',
+                    mask: 'single',
+                    name: 'query2'
+                };
 
-                expect(poolState.size).to.equal(0);
-                expect(poolState.idle).to.equal(0);
+                const Template = Query.template('SELECT * FROM tmp_users WHERE username = {{username}};', {mask: 'single'});
+                const query3 = new Template({username: 'T\'est'});
 
-                // return database.connect().then((session) => {
-                //     return prepareDatabase(session).then(() => {
-                //         assert.strictEqual(session.isActive, true);
-                //         const poolState = database.getPoolState();
-                //         assert.strictEqual(poolState.size, 1);
-                //         assert.strictEqual(poolState.idle, 0);
-                //
-                //         return session.close().then(() => {
-                //             assert.strictEqual(session.isActive, false);
-                //             const poolState = database.getPoolState();
-                //             assert.strictEqual(poolState.size, 1);
-                //             assert.strictEqual(poolState.idle, 1);
-                //         });
-                //     });
-                // });
+                const query4: SingleResultQuery<User> = {
+                    text: 'SELECT * FROM tmp_users WHERE id = 3;',
+                    mask: 'single',
+                    name: 'query4'
+                };
+
+                const [result1, result2, result3, result4] = await Promise.all([session.execute(query1), session.execute(query2), session.execute(query3), session.execute(query4)]);
+
+                expect(result1.id).to.equal(1);
+                expect(result2.id).to.equal(2);
+                expect(result3.username).to.equal('T\'est');
+                expect(result4.id).to.equal(3);
             });
 
-        //     it('Committing a transaction should update the data in the database', () => {
-        //         const database = new Database(settings);
-        //         return database.connect().then((session) => {
-        //             return prepareDatabase(session).then(() => {
-        //                 return session.startTransaction().then(() => {
-        //                     const query: Query = {
-        //                         text: 'UPDATE tmp_users SET username = $1 WHERE id = 1;',
-        //                         values: ['Test']
-        //                     };
-        //
-        //                     return session.execute(query).then(() => {
-        //                         return session.close('commit').then(() => {
-        //                             assert.strictEqual(session.isActive, false);
-        //                             assert.strictEqual(session.inTransaction, false);
-        //                         });
-        //                     });
-        //                 });
-        //             });
-        //         })
-        //             .then(() => {
-        //                 return database.connect().then((session) => {
-        //                     const query: SingleResultQuery<User> = {
-        //                         text: 'SELECT * FROM tmp_users WHERE id = 1;',
-        //                         mask: 'single'
-        //                     };
-        //                     return session.execute(query).then((user) => {
-        //                         assert.strictEqual(user.id, 1);
-        //                         assert.strictEqual(user.username, 'Test');
-        //                     }).then(() => session.close());
-        //                 })
-        //             });
-        //     });
-        //
-        //     it('Rolling back a transaction should not change the data in the database', () => {
-        //         const database = new Database(settings);
-        //         return database.connect().then((session) => {
-        //             return prepareDatabase(session).then(() => {
-        //                 return session.startTransaction().then(() => {
-        //                     const query: Query = {
-        //                         text: 'UPDATE tmp_users SET username = {{un}} WHERE id = 1;',
-        //                         params: {
-        //                             un: 'Test'
-        //                         }
-        //                     };
-        //
-        //                     return session.execute(query).then(() => {
-        //                         return session.close('rollback').then(() => {
-        //                             assert.strictEqual(session.isActive, false);
-        //                             assert.strictEqual(session.inTransaction, false);
-        //                         });
-        //                     });
-        //                 });
-        //             });
-        //         })
-        //             .then(() => {
-        //                 return database.connect().then((session) => {
-        //                     const query: SingleResultQuery<User> = {
-        //                         text: 'SELECT * FROM tmp_users WHERE id = 1;',
-        //                         mask: 'single'
-        //                     };
-        //
-        //                     return session.execute(query).then((user) => {
-        //                         assert.strictEqual(user.id, 1);
-        //                         assert.strictEqual(user.username, 'Irakliy');
-        //                     }).then(() => session.close());
-        //                 })
-        //             });
-        //     });
+            it('Two parametrized queries in a row should produce correct result', async () => {
+                const query1: SingleResultQuery<User> = {
+                    text: 'SELECT * FROM tmp_users WHERE id = 1;',
+                    mask: 'single',
+                    name: 'query1'
+                };
+
+                const Template2 = Query.template('SELECT * FROM tmp_users WHERE username = {{username}};', {mask: 'single'});
+                const query2 = new Template2({username: 'T\'est'});
+
+                const Template3 = Query.template('SELECT * FROM tmp_users WHERE id = {{id}};', {mask: 'single'});
+                const query3 = new Template3({id: 2});
+
+                const query4: SingleResultQuery<User> = {
+                    text: 'SELECT * FROM tmp_users WHERE id = 3;',
+                    mask: 'single',
+                    name: 'query4'
+                };
+
+                const [result1, result2, result3, result4] = await Promise.all([session.execute(query1), session.execute(query2), session.execute(query3), session.execute(query4)]);
+
+                expect(result1.id).to.equal(1);
+                expect(result2.username).to.equal('T\'est');
+                expect(result3.id).to.equal(2);
+                expect(result4.id).to.equal(3);
+            });
         });
     });
 
-    describe('Error condition tests;', () => {
-        // it('Query execution error should close the session and release the connection back to the pool', async () => {
-        //     const query = {
-        //         text: undefined
-        //     };
-        //
-        //
-        //     const database = new Database(settings);
-        //     return database.connect().then((session) => {
-        //         return prepareDatabase(session).then(() => {
-        //             const query = {
-        //                 text: undefined
-        //             };
-        //
-        //             return session.execute(query)
-        //                 .then(() => {
-        //                     assert.fail();
-        //                 })
-        //                 .catch((reason) => {
-        //                     assert.ok(reason instanceof Error);
-        //                     assert.ok(reason instanceof QueryError);
-        //                     assert.strictEqual(session.isActive, false);
-        //                     assert.strictEqual(database.getPoolState().size, 1);
-        //                     assert.strictEqual(database.getPoolState().idle, 1);
-        //                 });
-        //         });
-        //     });
-        // });
+    describe('Session lifecycle tests;', () => {
+        let poolState: PoolState;
 
-    //     it('Query execution error should roll back an active transaction', () => {
-    //         const database = new Database(settings);
-    //         return database.connect().then((session) => {
-    //             return prepareDatabase(session).then(() => {
-    //                 return session.startTransaction().then(() => {
-    //                     const query: Query = {
-    //                         text: `UPDATE tmp_users SET username = 'Test' WHERE id = 1;`
-    //                     };
-    //
-    //                     return session.execute(query).then(() => {
-    //                         const errorQuery = {
-    //                             text: undefined
-    //                         };
-    //
-    //                         return session.execute(errorQuery).then(() => {
-    //                             assert.fail();
-    //                         }).catch((reason) => {
-    //                             assert.ok(reason instanceof Error);
-    //                             assert.ok(reason instanceof QueryError);
-    //                             assert.strictEqual(session.isActive, false);
-    //                             assert.strictEqual(database.getPoolState().size, 1);
-    //                             assert.strictEqual(database.getPoolState().idle, 1);
-    //                         });
-    //                     });
-    //                 });
-    //             });
-    //         })
-    //             .then(() => {
-    //                 return database.connect().then((session) => {
-    //                     const query: SingleResultQuery<User> = {
-    //                         text: 'SELECT * FROM tmp_users WHERE id = 1;',
-    //                         mask: 'single'
-    //                     };
-    //
-    //                     return session.execute(query).then((user) => {
-    //                         assert.strictEqual(user.id, 1);
-    //                         assert.strictEqual(user.username, 'Irakliy');
-    //                     }).then(() => session.close());
-    //                 })
-    //             });
-    //     });
-    //
-    //     it('Starting a transaction on a closed session should throw an error', () => {
-    //         const database = new Database(settings);
-    //         return database.connect().then((session) => {
-    //             return session.close().then(() => {
-    //                 return session.startTransaction()
-    //                     .then(() => {
-    //                         assert.fail();
-    //                     })
-    //                     .catch((reason) => {
-    //                         assert.ok(reason instanceof Error);
-    //                         assert.ok(reason instanceof ConnectionError);
-    //                         assert.strictEqual(session.isActive, false);
-    //                         assert.strictEqual(database.getPoolState().size, 1);
-    //                         assert.strictEqual(database.getPoolState().idle, 1);
-    //                     });
-    //             });
-    //         });
-    //     });
-    //
-    //     it('Starting a transaction when a session is in transaction should throw an error', () => {
-    //         const database = new Database(settings);
-    //         return database.connect().then((session) => {
-    //             return session.startTransaction().then(() => {
-    //                 return session.startTransaction()
-    //                     .then(() => {
-    //                         assert.fail();
-    //                     })
-    //                     .catch((reason) => {
-    //                         assert.ok(reason instanceof Error);
-    //                         assert.ok(reason instanceof TransactionError);
-    //                         assert.strictEqual(session.isActive, true);
-    //                     });
-    //             }).then(() => session.close('rollback'));
-    //         });
-    //     });
-    //
-    //     it('Closing an already closed session should throw an error', () => {
-    //         const database = new Database(settings);
-    //         return database.connect().then((session) => {
-    //             return session.close().then(() => {
-    //                 return session.close()
-    //                     .then(() => {
-    //                         assert.fail();
-    //                     })
-    //                     .catch((reason) => {
-    //                         assert.ok(reason instanceof Error);
-    //                         assert.ok(reason instanceof ConnectionError);
-    //                         assert.strictEqual(session.isActive, false);
-    //                     });
-    //             });
-    //         });
-    //     });
-    //
-    //     it('Closing a session with an uncommitted transaction should throw an error', () => {
-    //         const database = new Database(settings);
-    //         return database.connect().then((session) => {
-    //             return session.startTransaction().then(() => {
-    //                 return session.close()
-    //                     .then(() => {
-    //                         assert.fail();
-    //                     })
-    //                     .catch((reason) => {
-    //                         assert.ok(reason instanceof Error);
-    //                         assert.ok(reason instanceof TransactionError);
-    //                         assert.strictEqual(session.isActive, false);
-    //                     });
-    //             });
-    //         });
-    //     });
-    //
-    //     it('Executing a query on a closed session should throw an error', () => {
-    //         const database = new Database(settings);
-    //         return database.connect().then((session) => {
-    //             return prepareDatabase(session).then(() => {
-    //                 return session.close().then(() => {
-    //                     const query: Query = {
-    //                         text: undefined
-    //                     };
-    //
-    //                     return session.execute(query)
-    //                         .then(() => {
-    //                             assert.fail();
-    //                         })
-    //                         .catch((reason) => {
-    //                             assert.ok(reason instanceof Error);
-    //                             assert.ok(reason instanceof ConnectionError);
-    //                             assert.strictEqual(session.isActive, false);
-    //                             assert.strictEqual(database.getPoolState().size, 1);
-    //                             assert.strictEqual(database.getPoolState().idle, 1);
-    //                         });
-    //                 });
-    //             });
-    //         });
-    //     });
-    //
-    //     it('Executing a query with no text should throw an error and close the session', () => {
-    //         const database = new Database(settings);
-    //         return database.connect().then((session) => {
-    //             return prepareDatabase(session).then(() => {
-    //                 const query: Query = {
-    //                     text: undefined
-    //                 };
-    //
-    //                 return session.execute(query)
-    //                     .then(() => {
-    //                         assert.fail();
-    //                     })
-    //                     .catch((reason) => {
-    //                         assert.ok(reason instanceof Error);
-    //                         assert.ok(reason instanceof QueryError);
-    //                         assert.strictEqual(session.isActive, false);
-    //                         assert.strictEqual(database.getPoolState().size, 1);
-    //                         assert.strictEqual(database.getPoolState().idle, 1);
-    //                     });
-    //             });
-    //         });
-    //     });
-    //
-    //     it('Executing a query with invalid SQL should throw an error and close the session', () => {
-    //         const database = new Database(settings);
-    //         return database.connect().then((session) => {
-    //             return prepareDatabase(session).then(() => {
-    //                 const query: Query = {
-    //                     text: 'SELLECT * FROM tmp_users;'
-    //                 };
-    //
-    //                 return session.execute(query)
-    //                     .then(() => {
-    //                         assert.fail();
-    //                     })
-    //                     .catch((reason) => {
-    //                         assert.ok(reason instanceof Error);
-    //                         assert.ok(reason instanceof QueryError);
-    //                         assert.strictEqual(session.isActive, false);
-    //                         assert.strictEqual(database.getPoolState().size, 1);
-    //                         assert.strictEqual(database.getPoolState().idle, 1);
-    //                     });
-    //             });
-    //         });
-    //     });
-    //
-    //     it('Executing a query with invalid result parser should throw an error and close the session', () => {
-    //         const database = new Database(settings);
-    //         return database.connect().then((session) => {
-    //             return prepareDatabase(session).then(() => {
-    //                 const query: ListResultQuery<User> = {
-    //                     text: 'SELECT * FROM tmp_users WHERE id = 1;',
-    //                     mask: 'list',
-    //                     handler: {
-    //                         parse: () => {
-    //                             throw new Error('Parsing error')
-    //                         }
-    //                     }
-    //                 };
-    //
-    //                 return session.execute(query)
-    //                     .then(() => {
-    //                         assert.fail();
-    //                     })
-    //                     .catch((reason) => {
-    //                         assert.ok(reason instanceof Error);
-    //                         assert.ok(reason instanceof ParseError);
-    //                         assert.strictEqual(session.isActive, false);
-    //                         assert.strictEqual(database.getPoolState().size, 1);
-    //                         assert.strictEqual(database.getPoolState().idle, 1);
-    //                     });
-    //             });
-    //         });
-    //     });
-    //
-    //     it('Attempt to connect to a non-existing database should throw an error', () => {
-    //         const settings1 = JSON.parse(JSON.stringify(settings));
-    //         settings1.connection.database = 'invalid';
-    //         const database = new Database(settings1);
-    //         return database.connect()
-    //             .catch((reason) => {
-    //                 assert.ok(reason instanceof ConnectionError);
-    //                 assert.ok(reason instanceof Error);
-    //             });
-    //     });
-    //
-    //     it('Executing two queries with errors should not crush the system', () => {
-    //         const database = new Database(settings);
-    //
-    //         return database.connect({startTransaction: true}).then((session) => {
-    //             return prepareDatabase(session).then(() => {
-    //                 const query: ListResultQuery<User> = {
-    //                     text: 'SELECT * FROM tmp_users WHERE id = abc;',
-    //                     mask: 'list'
-    //                 };
-    //
-    //                 session.execute(query).catch((error) => {
-    //                     assert.strictEqual(error.message, 'column "abc" does not exist');
-    //                 });
-    //                 return session.execute(query).catch((error) => {
-    //                     assert.strictEqual(error.message, 'current transaction is aborted, commands ignored until end of transaction block');
-    //                 });
-    //             });
-    //         });
-    //     });
-    //
-    //     it('Executing a query after committing a transaction should throw an error', () => {
-    //         const database = new Database(settings);
-    //
-    //         return database.connect({startTransaction: true}).then((session) => {
-    //             return prepareDatabase(session).then(() => {
-    //                 const query: ListResultQuery<User> = {
-    //                     text: 'SELECT * FROM tmp_users WHERE id = 1;',
-    //                     mask: 'list'
-    //                 };
-    //
-    //                 return session.execute(query).then(() => {
-    //
-    //                     return session.close('commit')
-    //                         .then(() => session.execute(query))
-    //                         .then(() => {
-    //                             assert.fail('Error was not thrown');
-    //                         })
-    //                         .catch((error) => {
-    //                             assert.strictEqual(error.message, 'Cannot execute queries: the session is closed');
-    //                         });
-    //                 });
-    //             });
-    //         });
-    //     });
-    //
-    //     it('Executing a query after rolling back a transaction should throw an error', () => {
-    //         const database = new Database(settings);
-    //
-    //         return database.connect({startTransaction: true}).then((session) => {
-    //             return prepareDatabase(session).then(() => {
-    //                 const query: ListResultQuery<User> = {
-    //                     text: 'SELECT * FROM tmp_users WHERE id = 1;',
-    //                     mask: 'list'
-    //                 };
-    //
-    //                 return session.execute(query).then(() => {
-    //
-    //                     return session.close('rollback')
-    //                         .then(() => session.execute(query))
-    //                         .then(() => {
-    //                             assert.fail('Error was not thrown');
-    //                         })
-    //                         .catch((error) => {
-    //                             assert.strictEqual(error.message, 'Cannot execute queries: the session is closed');
-    //                         });
-    //                 });
-    //             });
-    //         });
+        beforeEach(async () => {
+            db = new Database(settings);
         });
+
+        it('Closing a session should return a connection back to the pool', async () => {
+            poolState = db.getPoolState();
+
+            expect(poolState.size).to.equal(0);
+            expect(poolState.idle).to.equal(0);
+
+            session = db.getSession(options, logger);
+            poolState = db.getPoolState();
+
+            expect(poolState.size).to.equal(0);
+            expect(poolState.idle).to.equal(0);
+
+            await prepareDatabase(session);
+            poolState = db.getPoolState();
+
+            expect(poolState.size).to.equal(1);
+            expect(poolState.idle).to.equal(0);
+
+            await session.close('commit');
+            poolState = db.getPoolState();
+
+            expect(poolState.size).to.equal(1);
+            expect(poolState.idle).to.equal(1);
+        });
+
+        it('Committing a transaction should update the data in the database', async () => {
+            session = db.getSession(options, logger);
+
+            await prepareDatabase(session);
+            await session.close('commit');
+
+            session = db.getSession(options, logger);
+
+            const query: Query = {
+                text: 'UPDATE tmp_users SET username = $1 WHERE id = 1;',
+                values: ['Test']
+            };
+
+            await session.execute(query);
+
+            expect(session.isActive).to.be.true;
+            expect(session.inTransaction).to.be.true;
+
+            await session.close('commit');
+
+            expect(session.isActive).to.be.false;
+            expect(session.inTransaction).to.be.false;
+
+            session = db.getSession(options, logger);
+
+            const query1: SingleResultQuery<User> = {
+                text: 'SELECT * FROM tmp_users WHERE id = 1;',
+                mask: 'single'
+            };
+
+            const result = await session.execute(query1);
+
+            expect(result.id).to.equal(1);
+            expect(result.username).to.equal('Test');
+
+            await session.close('commit');
+        });
+
+        it('Rolling back a transaction should not change the data in the database', async () => {
+            session = db.getSession(options, logger);
+
+            await prepareDatabase(session);
+            await session.close('commit');
+
+            session = db.getSession(options, logger);
+
+            const query: Query = {
+                text: 'UPDATE tmp_users SET username = $1 WHERE id = 1;',
+                values: ['Test']
+            };
+
+            await session.execute(query);
+
+            expect(session.isActive).to.be.true;
+            expect(session.inTransaction).to.be.true;
+
+            await session.close('rollback');
+
+            expect(session.isActive).to.be.false;
+            expect(session.inTransaction).to.be.false;
+
+            session = db.getSession(options, logger);
+
+            const query1: SingleResultQuery<User> = {
+                text: 'SELECT * FROM tmp_users WHERE id = 1;',
+                mask: 'single'
+            };
+
+            const result = await session.execute(query1);
+
+            expect(result.id).to.equal(1);
+            expect(result.username).to.equal('Irakliy');
+
+            await session.close('commit');
+        });
+    });
+
+    describe.only('Error condition tests;', () => {
+        beforeEach(async () => {
+            db = new Database(settings);
+            session = db.getSession(options, logger);
+
+            await prepareDatabase(session);
+        });
+
+        afterEach(async () => {
+            if ( session && session.isActive) {
+                await session.close('rollback');
+            }
+        });
+
+        it('Query execution error should close the session and release the connection back to the pool', async () => {
+            const query = {
+                text: undefined
+            };
+
+            await expect(session.execute(query as any)).to.eventually
+                .be.rejectedWith(Error, 'A query must have either text or a name. Supplying neither is unsupported.');
+
+            expect(db.getPoolState().size).to.equal(1);
+            expect(db.getPoolState().idle).to.equal(0);
+
+            expect(session.isActive).to.to.be.true;
+        });
+
+        it('Query execution error should roll back an active transaction', async () => {
+            await prepareDatabase(session);
+
+            const query1: Query = {
+                text: `UPDATE tmp_users SET username = 'Test' WHERE id = 1;`
+            };
+
+            const result = await session.execute(query1);
+
+            expect(result).to.be.undefined;
+
+            const errorQuery = {
+                text: undefined
+            };
+
+            await expect(session.execute(errorQuery as any)).to.eventually.be.rejectedWith(Error);
+
+            expect(db.getPoolState().size).to.equal(1);
+            expect(db.getPoolState().idle).to.equal(0);
+
+            const query2: SingleResultQuery<User> = {
+                text: 'SELECT * FROM tmp_users WHERE id = 1;',
+                mask: 'single'
+            };
+
+            const user = await session.execute(query2);
+
+            expect(user.id).to.equal(1);
+            expect(user.username).to.equal('Irakliy');
+        });
+
+        it('Closing an already closed session should throw an error', async () => {
+            await session.close('commit');
+
+            expect(session.isActive).to.be.false;
+
+            await expect(session.close('commit')).to.eventually.be.rejectedWith(Error, 'Cannot close session: session has already been closed');
+        });
+
+        it('Executing a query after committing a transaction should throw an error', async () => {
+            const query: Query = {
+                text: `DROP TABLE IF EXISTS tmp_users;`,
+                name: 'dropTable'
+            };
+
+            await session.close('commit');
+
+            expect(session.isActive).to.be.false;
+
+            await expect(session.execute(query)).to.eventually.be.rejectedWith(Error, 'Cannot execute a query: session is closed');
+
+            expect(db.getPoolState().size).to.equal(1);
+            expect(db.getPoolState().idle).to.equal(1);
+        });
+
+        it('Executing a query after rolling back a transaction should throw an error', async () => {
+            const query: Query = {
+                text: `DROP TABLE IF EXISTS tmp_users;`,
+                name: 'dropTable'
+            };
+
+            await session.close('rollback');
+
+            expect(session.isActive).to.be.false;
+
+            await expect(session.execute(query)).to.eventually.be.rejectedWith(Error, 'Cannot execute a query: session is closed');
+
+            expect(db.getPoolState().size).to.equal(1);
+            expect(db.getPoolState().idle).to.equal(1);
+        });
+
+        it('Executing a query with invalid SQL should throw an error and close the session', async () => { // todo rename or fix
+            const query: Query = {
+                text: 'SELLECT * FROM tmp_users;'
+            };
+
+            await expect(session.execute(query)).to.eventually.be.rejectedWith(Error, 'syntax error at');
+
+            expect(db.getPoolState().size).to.equal(1);
+            expect(db.getPoolState().idle).to.equal(0);
+
+            expect(session.isActive).to.to.be.true;
+        });
+
+        it('Executing a query with invalid result parser should throw an error and close the session', async () => { // todo rename or fix
+            const query: ListResultQuery<User> = {
+                text: 'SELECT * FROM tmp_users WHERE id = 1;',
+                mask: 'list',
+                handler: {
+                    parse: () => {
+                        throw new Error('Parsing error')
+                    }
+                }
+            };
+
+            await expect(session.execute(query)).to.eventually.be.rejectedWith(Error, 'Failed to parse results');
+
+            expect(db.getPoolState().size).to.equal(1);
+            expect(db.getPoolState().idle).to.equal(0);
+
+            expect(session.isActive).to.to.be.true;
+        });
+
+        it('Attempt to connect to a non-existing database should throw an error', async () => { //todo
+            const settings1 = JSON.parse(JSON.stringify(settings));
+
+            settings1.connection.database = 'invalid';
+            settings1.connection.port = 1234;
+
+            const database = new Database(settings1);
+            const eSession = database.getSession(options, logger);
+
+            const query: Query = {
+                text: `DROP TABLE IF EXISTS tmp_users;`
+            };
+
+            await expect(eSession.execute(query)).to.eventually.be.rejectedWith(Error, 'connect ECONNREFUSED');
+
+            expect(db.getPoolState().size).to.equal(1);
+            expect(db.getPoolState().idle).to.equal(0);
+
+            expect(session.isActive).to.to.be.true;
+        });
+    });
 });
