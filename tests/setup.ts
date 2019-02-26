@@ -18,6 +18,7 @@ export interface User {
 export class qFetchUserById implements SingleResultQuery<User> {
     text: string;
     mask: 'single' = 'single';
+    handler = Object;
 
     constructor(userId: number) {
         this.text = `
@@ -31,7 +32,7 @@ export class qFetchUserById implements SingleResultQuery<User> {
 export class qFetchRawUserById implements SingleResultQuery<any[]> {
     text: string;
     mask: 'single' = 'single';
-    mode: 'array' = 'array';
+    handler = Array;
 
     constructor(userId: number) {
         this.text = `
@@ -43,6 +44,7 @@ export class qFetchRawUserById implements SingleResultQuery<any[]> {
 export class qFetchUsersByIdList implements ListResultQuery<User> {
     text: string;
     mask: 'list' = 'list';
+    handler = Object;
 
     constructor(userIdList: number[]) {
         this.text = `

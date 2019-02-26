@@ -31,6 +31,7 @@
   },
   "devDependencies": {
     "@types/chai": "4.1.x",
+    "@types/chai-as-promised": "7.1.x",
     "@types/mocha": "5.2.x",
     "@types/node": "10.12.x",
     "chai": "4.2.x",
