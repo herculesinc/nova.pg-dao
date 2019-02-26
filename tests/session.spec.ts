@@ -6,7 +6,7 @@ chai.use(chaiAsPromised);
 const expect = chai.expect;
 
 import { Database } from './../index';
-import { ListResultQuery, SingleResultQuery, SessionOptions, PoolState } from '@nova/pg-dao';
+import { SessionOptions, PoolState, QueryHandler } from '@nova/pg-dao';
 import { Query } from '../index';
 import { DaoSession } from '../lib/Session';
 import { User, prepareDatabase } from './setup';
@@ -23,6 +23,10 @@ const options: SessionOptions = {
 
 const logger = new MockLogger();
 
+const idHandler: QueryHandler = {
+    parse: (row: any) => Number(row[0])
+};
+
 describe('NOVA.PG-DAO -> Session;', () => {
     describe('Query tests;', () => {
         beforeEach(async () => {
@@ -38,12 +42,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
         describe('Object query tests;', () => {
             it('Object query should return a single object', async () => {
-                const query: SingleResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id = 1;',
-                    mask    : 'single',
-                    name    : 'getUserById',
-                    handler : Object
-                };
+                const query = Query.from('SELECT * FROM tmp_users WHERE id = 1;', 'getUserById', 'single');
 
                 const user = await session.execute(query);
 
@@ -54,12 +53,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Object query should return undefined on no rows', async () => {
-                const query: SingleResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id = 0;',
-                    mask    : 'single',
-                    name    : 'getUserById',
-                    handler : Object
-                };
+                const query = Query.from('SELECT * FROM tmp_users WHERE id = 0;', 'getUserById', 'single');
 
                 const user = await session.execute(query);
 
@@ -67,19 +61,8 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Multiple object queries should produce a Map of objects', async () => { //todo rename
-                const query1: SingleResultQuery<User> = {
-                    text: 'SELECT * FROM tmp_users WHERE id = 1;',
-                    mask: 'single',
-                    name: 'query1',
-                    handler : Object
-                };
-
-                const query2: SingleResultQuery<User> = {
-                    text: 'SELECT * FROM tmp_users WHERE id = 2;',
-                    mask: 'single',
-                    name: 'query2',
-                    handler : Object
-                };
+                const query1 = Query.from('SELECT * FROM tmp_users WHERE id = 1;', 'query1', 'single');
+                const query2 = Query.from('SELECT * FROM tmp_users WHERE id = 2;', 'query2', 'single');
 
                 const [result1, result2] = await Promise.all([session.execute(query1), session.execute(query2)]);
 
@@ -91,26 +74,9 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Multiple object queries with the same name should produce a Map with a single key', async () => { //todo rename
-                const query1: SingleResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id = 1;',
-                    mask    : 'single',
-                    name    : 'getUserById',
-                    handler : Object
-                };
-
-                const query2: SingleResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id = 2;',
-                    mask    : 'single',
-                    name    : 'getUserById',
-                    handler : Object
-                };
-
-                const query3: SingleResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id = 3;',
-                    mask    : 'single',
-                    name    : 'getUserById',
-                    handler : Object
-                };
+                const query1 = Query.from('SELECT * FROM tmp_users WHERE id = 1;', 'getUserById', 'single');
+                const query2 = Query.from('SELECT * FROM tmp_users WHERE id = 2;', 'getUserById', 'single');
+                const query3 = Query.from('SELECT * FROM tmp_users WHERE id = 3;', 'getUserById', 'single');
 
                 const [result1, result2, result3] = await Promise.all([session.execute(query1), session.execute(query2), session.execute(query3)]);
 
@@ -125,24 +91,9 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Unnamed object queries should aggregate into undefined key', async () => { //todo rename
-                const query1: SingleResultQuery<User> = {
-                    text    : 'SELECT id, username FROM tmp_users WHERE id = 1;',
-                    mask    : 'single',
-                    handler : Object
-                };
-
-                const query2: SingleResultQuery<User> = {
-                    text    : 'SELECT id, username FROM tmp_users WHERE id = 3;',
-                    mask    : 'single',
-                    handler : Object
-                };
-
-                const query3: SingleResultQuery<User> = {
-                    text    : 'SELECT id, username FROM tmp_users WHERE id = 3;',
-                    mask    : 'single',
-                    name    : 'test',
-                    handler : Object
-                };
+                const query1 = Query.from('SELECT * FROM tmp_users WHERE id = 1;', {mask: 'single'});
+                const query2 = Query.from('SELECT * FROM tmp_users WHERE id = 3;', {mask: 'single'});
+                const query3 = Query.from('SELECT * FROM tmp_users WHERE id = 3;', 'test', 'single');
 
                 const [result1, result2, result3] = await Promise.all([session.execute(query1), session.execute(query2), session.execute(query3)]);
 
@@ -157,26 +108,9 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Multiple object queries should not produce an array with holes', async () => { //todo rename
-                const query1: SingleResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id = 1;',
-                    mask    : 'single',
-                    name    : 'getUserById',
-                    handler : Object
-                };
-
-                const query2: SingleResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id = 0;',
-                    mask    : 'single',
-                    name    : 'getUserById',
-                    handler : Object
-                };
-
-                const query3: SingleResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id = 3;',
-                    mask    : 'single',
-                    name    : 'getUserById',
-                    handler : Object
-                };
+                const query1 = Query.from('SELECT * FROM tmp_users WHERE id = 1;', 'getUserById', 'single');
+                const query2 = Query.from('SELECT * FROM tmp_users WHERE id = 0;', 'getUserById', 'single');
+                const query3 = Query.from('SELECT * FROM tmp_users WHERE id = 3;', 'getUserById', 'single');
 
                 const [result1, result2, result3] = await Promise.all([session.execute(query1), session.execute(query2), session.execute(query3)]);
 
@@ -190,13 +124,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Object query with a handler should be parsed using custom parsing method', async () => {
-                const query: SingleResultQuery<number> = {
-                    text: 'SELECT id, username FROM tmp_users WHERE id = 1;',
-                    mask: 'single',
-                    handler: {
-                        parse: (row: any) => row.id
-                    }
-                };
+                const query = Query.from('SELECT id, username FROM tmp_users WHERE id = 1;', {mask: 'single', handler: idHandler});
 
                 const userId = await session.execute(query);
 
@@ -204,21 +132,8 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Multiple object queries with a handler should be parsed using custom parsing method', async () => {
-                const query1: SingleResultQuery<number> = {
-                    text: 'SELECT id, username FROM tmp_users WHERE id = 1;',
-                    mask: 'single',
-                    handler: {
-                        parse: (row: any) => row.id
-                    }
-                };
-
-                const query2: SingleResultQuery<number> = {
-                    text: 'SELECT id, username FROM tmp_users WHERE id = 2;',
-                    mask: 'single',
-                    handler: {
-                        parse: (row: any) => row.id
-                    }
-                };
+                const query1 = Query.from('SELECT id, username FROM tmp_users WHERE id = 1;', {mask: 'single', handler: idHandler});
+                const query2 = Query.from('SELECT id, username FROM tmp_users WHERE id = 2;', {mask: 'single', handler: idHandler});
 
                 const [result1, result2] = await Promise.all([session.execute(query1), session.execute(query2)]);
 
@@ -229,11 +144,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
         describe('List query tests;', () => {
             it('List query should return an array of objects', async () => {
-                const query: ListResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id IN (1, 3);',
-                    mask    : 'list',
-                    handler : Object
-                };
+                const query = Query.from('SELECT * FROM tmp_users WHERE id IN (1, 3);','query', 'list');
 
                 const users = await session.execute(query);
 
@@ -247,11 +158,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('List query should return an empty array on no rows', async () => {
-                const query: ListResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id IN (0);',
-                    mask    : 'list',
-                    handler : Object
-                };
+                const query = Query.from('SELECT * FROM tmp_users WHERE id IN (0);','query', 'list');
 
                 const users = await session.execute(query);
 
@@ -259,19 +166,8 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Multiple list queries should produce a Map of arrays', async () => { //todo rename
-                const query1: ListResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id IN (1, 2);',
-                    mask    : 'list',
-                    name    : 'query1',
-                    handler : Object
-                };
-
-                const query2: ListResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id IN (3);',
-                    mask    : 'list',
-                    name    : 'query2',
-                    handler : Object
-                };
+                const query1 = Query.from('SELECT * FROM tmp_users WHERE id IN (1,2);','query1', 'list');
+                const query2 = Query.from('SELECT * FROM tmp_users WHERE id IN (3);','query2', 'list');
 
                 const [result1, result2] = await Promise.all([session.execute(query1), session.execute(query2)]);
 
@@ -284,19 +180,8 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Multiple list queries with the same name should produce a Map with a single key', async () => { //todo rename
-                const query1: ListResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id IN (1, 2);',
-                    mask    : 'list',
-                    name    : 'query',
-                    handler : Object
-                };
-
-                const query2: ListResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id IN (3);',
-                    mask    : 'list',
-                    name    : 'query',
-                    handler : Object
-                };
+                const query1 = Query.from('SELECT * FROM tmp_users WHERE id IN (1,2);','query', 'list');
+                const query2 = Query.from('SELECT * FROM tmp_users WHERE id IN (3);','query', 'list');
 
                 const [result1, result2] = await Promise.all([session.execute(query1), session.execute(query2)]);
 
@@ -309,26 +194,9 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Multiple list queries with the same name should produce an array for every query', async () => { //todo rename
-                const query1: ListResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id IN (1, 2);',
-                    mask    : 'list',
-                    name    : 'query',
-                    handler : Object
-                };
-
-                const query2: ListResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id IN (0);',
-                    mask    : 'list',
-                    name    : 'query',
-                    handler : Object
-                };
-
-                const query3: ListResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id IN (3);',
-                    mask    : 'list',
-                    name    : 'query',
-                    handler : Object
-                };
+                const query1 = Query.from('SELECT * FROM tmp_users WHERE id IN (1,2);','query', 'list');
+                const query2 = Query.from('SELECT * FROM tmp_users WHERE id IN (0);','query', 'list');
+                const query3 = Query.from('SELECT * FROM tmp_users WHERE id IN (3);','query', 'list');
 
                 const [result1, result2, result3] = await Promise.all([session.execute(query1), session.execute(query2), session.execute(query3)]);
 
@@ -338,17 +206,8 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Unnamed list queries should aggregate into undefined key', async () => { //todo rename
-                const query1: ListResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id IN (1, 2);',
-                    mask    : 'list',
-                    handler : Object
-                };
-
-                const query2: ListResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id IN (3);',
-                    mask    : 'list',
-                    handler : Object
-                };
+                const query1 = Query.from('SELECT * FROM tmp_users WHERE id IN (1,2);', {mask: 'list'});
+                const query2 = Query.from('SELECT * FROM tmp_users WHERE id IN (3);', {mask: 'list'});
 
                 const [result1, result2] = await Promise.all([session.execute(query1), session.execute(query2)]);
 
@@ -357,13 +216,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('List query with a handler should be parsed using custom parsing method', async () => {
-                const query: ListResultQuery<number> = {
-                    text: 'SELECT id, username FROM tmp_users WHERE id IN (1,2);',
-                    mask: 'list',
-                    handler: {
-                        parse: (row: any) => row.id
-                    }
-                };
+                const query = Query.from('SELECT * FROM tmp_users WHERE id IN (1,2);', {mask: 'list', handler: idHandler});
 
                 const userIds = await session.execute(query);
 
@@ -376,9 +229,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
         describe('Non-result query tests;', () => {
             it('A non-result query should produce no results', async () => {
-                const query: Query = {
-                    text: `UPDATE tmp_users SET username = 'irakliy' WHERE username = 'irakliy';`
-                };
+                const query = Query.from('UPDATE tmp_users SET username = \'irakliy\' WHERE username = \'irakliy\';');
 
                 const result = await session.execute(query);
 
@@ -386,9 +237,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Multiple non-result queries should produce no results', async () => {
-                const query: Query = {
-                    text: `UPDATE tmp_users SET username = 'irakliy' WHERE username = 'irakliy';`
-                };
+                const query = Query.from('UPDATE tmp_users SET username = \'irakliy\' WHERE username = \'irakliy\';');
 
                 const [result1, result2] = await Promise.all([session.execute(query), session.execute(query)]);
 
@@ -399,19 +248,8 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
         describe('Mixed query tests;', () => {
             it('Multiple mixed queries should produce a Map of results', async () => {
-                const query1: SingleResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id = 2;',
-                    mask    : 'single',
-                    name    : 'query1',
-                    handler : Object
-                };
-
-                const query2: ListResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id IN (1, 3);',
-                    mask    : 'list',
-                    name    : 'query2',
-                    handler : Object
-                };
+                const query1 = Query.from('SELECT * FROM tmp_users WHERE id = 2;','query1', 'single');
+                const query2 = Query.from('SELECT * FROM tmp_users WHERE id IN (1,3);','query2', 'list');
 
                 const [result1, result2] = await Promise.all([session.execute(query1), session.execute(query2)]);
 
@@ -423,24 +261,9 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Unnamed mixed queries should aggregate into undefined key', async () => { // todo rename
-                const query1: SingleResultQuery<{ id: number, username: string }> = {
-                    text    : 'SELECT id, username FROM tmp_users WHERE id = 1;',
-                    mask    : 'single',
-                    handler : Object
-                };
-
-                const query2: ListResultQuery<{ id: number, username: string }> = {
-                    text    : 'SELECT id, username FROM tmp_users WHERE id IN (2, 3);',
-                    mask    : 'list',
-                    handler : Object
-                };
-
-                const query3: ListResultQuery<{ id: number, username: string }> = {
-                    text    : 'SELECT id, username FROM tmp_users WHERE id IN (2, 3);',
-                    mask    : 'list',
-                    name    : 'test',
-                    handler : Object
-                };
+                const query1 = Query.from('SELECT * FROM tmp_users WHERE id = 1;', {mask: 'single'});
+                const query2 = Query.from('SELECT * FROM tmp_users WHERE id IN (2,3);', {mask: 'list'});
+                const query3 = Query.from('SELECT * FROM tmp_users WHERE id IN (2,3);','test', 'list');
 
                 const [result1, result2, result3] = await Promise.all([session.execute(query1), session.execute(query2), session.execute(query3)]);
 
@@ -456,28 +279,10 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Unnamed non-result queries should not produce holes in result array', async () => {
-                const query1: SingleResultQuery<{ id: number, username: string }> = {
-                    text    : 'SELECT id, username FROM tmp_users WHERE id = 1;',
-                    mask    : 'single',
-                    handler : Object
-                };
-
-                const query2: Query = {
-                    text: `UPDATE tmp_users SET username = 'irakliy' WHERE username = 'irakliy';`
-                };
-
-                const query3: ListResultQuery<{ id: number, username: string }> = {
-                    text    : 'SELECT id, username FROM tmp_users WHERE id IN (2, 3);',
-                    mask    : 'list',
-                    handler : Object
-                };
-
-                const query4: ListResultQuery<{ id: number, username: string }> = {
-                    text    : 'SELECT id, username FROM tmp_users WHERE id IN (2, 3);',
-                    mask    : 'list',
-                    name    : 'test',
-                    handler : Object
-                };
+                const query1 = Query.from('SELECT * FROM tmp_users WHERE id = 1;', {mask: 'single'});
+                const query2 = Query.from('UPDATE tmp_users SET username = \'irakliy\' WHERE username = \'irakliy\';');
+                const query3 = Query.from('SELECT id, username FROM tmp_users WHERE id IN (2, 3);', 'test', 'list');
+                const query4 = Query.from('SELECT id, username FROM tmp_users WHERE id IN (2, 3);', 'test', 'list');
 
                 const [result1, result2, result3, result4] = await Promise.all([session.execute(query1), session.execute(query2), session.execute(query3), session.execute(query4)]);
 
@@ -527,29 +332,14 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Mix of parameterized and non-parameterized queries should return correct result map', async () => {
-                const query1: SingleResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id = 1;',
-                    mask    : 'single',
-                    name    : 'query1',
-                    handler : Object
-                };
 
-                const query2: SingleResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id = 2;',
-                    mask    : 'single',
-                    name    : 'query2',
-                    handler : Object
-                };
+                const query1 = Query.from('SELECT * FROM tmp_users WHERE id = 1;','query1', 'single');
+                const query2 = Query.from('SELECT * FROM tmp_users WHERE id = 2;','query2', 'single');
 
                 const Template = Query.template<User>('SELECT * FROM tmp_users WHERE username = {{username}};', {mask: 'single'});
                 const query3 = new Template({username: 'T\'est'});
 
-                const query4: SingleResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id = 3;',
-                    mask    : 'single',
-                    name    : 'query4',
-                    handler : Object
-                };
+                const query4 = Query.from('SELECT * FROM tmp_users WHERE id = 3;','query4', 'single');
 
                 const [result1, result2, result3, result4] = await Promise.all([session.execute(query1), session.execute(query2), session.execute(query3), session.execute(query4)]);
 
@@ -560,12 +350,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Two parametrized queries in a row should produce correct result', async () => {
-                const query1: SingleResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id = 1;',
-                    mask    : 'single',
-                    name    : 'query1',
-                    handler : Object
-                };
+                const query1 = Query.from('SELECT * FROM tmp_users WHERE id = 1;','query1', 'single');
 
                 const Template2 = Query.template<User>('SELECT * FROM tmp_users WHERE username = {{username}};', {mask: 'single'});
                 const query2 = new Template2({username: 'T\'est'});
@@ -573,12 +358,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 const Template3 = Query.template<User>('SELECT * FROM tmp_users WHERE id = {{id}};', {mask: 'single'});
                 const query3 = new Template3({id: 2});
 
-                const query4: SingleResultQuery<User> = {
-                    text    : 'SELECT * FROM tmp_users WHERE id = 3;',
-                    mask    : 'single',
-                    name    : 'query4',
-                    handler : Object
-                };
+                const query4 = Query.from('SELECT * FROM tmp_users WHERE id = 3;','query4', 'single');
 
                 const [result1, result2, result3, result4] = await Promise.all([session.execute(query1), session.execute(query2), session.execute(query3), session.execute(query4)]);
 
@@ -630,12 +410,9 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
             session = db.getSession(options, logger);
 
-            const query: Query = {
-                text: 'UPDATE tmp_users SET username = $1 WHERE id = 1;',
-                values: ['Test']
-            };
+            const query1 = Query.from('UPDATE tmp_users SET username = \'Test\' WHERE id = 1;');
 
-            await session.execute(query);
+            await session.execute(query1);
 
             expect(session.isActive).to.be.true;
             expect(session.inTransaction).to.be.true;
@@ -647,16 +424,12 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
             session = db.getSession(options, logger);
 
-            const query1: SingleResultQuery<User> = {
-                text    : 'SELECT * FROM tmp_users WHERE id = 1;',
-                mask    : 'single',
-                handler : Object
-            };
+            const query2 = Query.from('SELECT * FROM tmp_users WHERE id = 1;', 'query', 'single');
 
-            const result = await session.execute(query1);
+            const result: any = await session.execute(query2);
 
-            expect(result!.id).to.equal(1);
-            expect(result!.username).to.equal('Test');
+            expect(result.id).to.equal(1);
+            expect(result.username).to.equal('Test');
 
             await session.close('commit');
         });
@@ -669,12 +442,9 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
             session = db.getSession(options, logger);
 
-            const query: Query = {
-                text: 'UPDATE tmp_users SET username = $1 WHERE id = 1;',
-                values: ['Test']
-            };
+            const query1 = Query.from('UPDATE tmp_users SET username = \'Test\' WHERE id = 1;');
 
-            await session.execute(query);
+            await session.execute(query1);
 
             expect(session.isActive).to.be.true;
             expect(session.inTransaction).to.be.true;
@@ -686,16 +456,12 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
             session = db.getSession(options, logger);
 
-            const query1: SingleResultQuery<User> = {
-                text    : 'SELECT * FROM tmp_users WHERE id = 1;',
-                mask    : 'single',
-                handler : Object
-            };
+            const query2 = Query.from('SELECT * FROM tmp_users WHERE id = 1;', 'query', 'single');
 
-            const result = await session.execute(query1);
+            const result: any = await session.execute(query2);
 
-            expect(result!.id).to.equal(1);
-            expect(result!.username).to.equal('Irakliy');
+            expect(result.id).to.equal(1);
+            expect(result.username).to.equal('Irakliy');
 
             await session.close('commit');
         });
@@ -716,12 +482,12 @@ describe('NOVA.PG-DAO -> Session;', () => {
         });
 
         it('Query execution error should close the session and release the connection back to the pool', async () => {
-            const query = {
+            const query: any = {
                 text: undefined
             };
 
-            await expect(session.execute(query as any)).to.eventually
-                .be.rejectedWith(Error, 'A query must have either text or a name. Supplying neither is unsupported.');
+            await expect(session.execute(query)).to.eventually
+                .be.rejectedWith(Error, 'Query text must be a string');
 
             expect(db.getPoolState().size).to.equal(1);
             expect(db.getPoolState().idle).to.equal(0);
@@ -738,14 +504,11 @@ describe('NOVA.PG-DAO -> Session;', () => {
         });
 
         it('Executing a query after committing a transaction should throw an error', async () => {
-            const query: Query = {
-                text: `DROP TABLE IF EXISTS tmp_users;`,
-                name: 'dropTable'
-            };
-
             await session.close('commit');
 
             expect(session.isActive).to.be.false;
+
+            const query = Query.from('DROP TABLE IF EXISTS tmp_users;');
 
             await expect(session.execute(query)).to.eventually.be.rejectedWith(Error, 'Cannot execute a query: session is closed');
 
@@ -754,14 +517,11 @@ describe('NOVA.PG-DAO -> Session;', () => {
         });
 
         it('Executing a query after rolling back a transaction should throw an error', async () => {
-            const query: Query = {
-                text: `DROP TABLE IF EXISTS tmp_users;`,
-                name: 'dropTable'
-            };
-
             await session.close('rollback');
 
             expect(session.isActive).to.be.false;
+
+            const query = Query.from('DROP TABLE IF EXISTS tmp_users;');
 
             await expect(session.execute(query)).to.eventually.be.rejectedWith(Error, 'Cannot execute a query: session is closed');
 
@@ -770,9 +530,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
         });
 
         it('Executing a query with invalid SQL should throw an error', async () => {
-            const query: Query = {
-                text: 'SELLECT * FROM tmp_users;'
-            };
+            const query = Query.from('SELLECT * FROM tmp_users;');
 
             await expect(session.execute(query)).to.eventually.be.rejectedWith(Error, 'syntax error at');
 
@@ -783,15 +541,14 @@ describe('NOVA.PG-DAO -> Session;', () => {
         });
 
         it('Executing a query with invalid result parser should throw an error', async () => {
-            const query: ListResultQuery<User> = {
-                text: 'SELECT * FROM tmp_users WHERE id = 1;',
+            const query = Query.from('SELECT * FROM tmp_users WHERE id = 1;', 'error', {
                 mask: 'list',
                 handler: {
                     parse: () => {
                         throw new Error('Parsing error')
                     }
                 }
-            };
+            });
 
             await expect(session.execute(query)).to.eventually.be.rejectedWith(Error, 'Failed to parse results');
 
@@ -810,9 +567,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             const database = new Database(settings1);
             const eSession = database.getSession(options, logger);
 
-            const query: Query = {
-                text: `DROP TABLE IF EXISTS tmp_users;`
-            };
+            const query = Query.from('DROP TABLE IF EXISTS tmp_users;');
 
             await expect(eSession.execute(query)).to.eventually.be.rejectedWith(Error, 'connect ECONNREFUSED');
 

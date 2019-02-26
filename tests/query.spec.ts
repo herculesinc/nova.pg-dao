@@ -8,7 +8,7 @@ function extractId(row: any): string {
 
 extractId.toJSON = () => 'extractIdFn';
 
-describe.only('NOVA.PG-DAO -> Query;', () => {
+describe('NOVA.PG-DAO -> Query;', () => {
     (Object as any).toJSON = () => 'Object';
     (Array as any).toJSON = () => 'Array';
 
