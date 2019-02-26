@@ -1,7 +1,9 @@
 // IMPORTS
 // ================================================================================================
 import { types } from 'pg';
-import { QueryMask, FieldParser } from '@nova/pg-dao';
+import { QueryMask, FieldDescriptor } from '@nova/pg-dao';
+import { Model } from '../Model';
+import { Store } from '../Store';
 import { Result, FieldDescription } from './index';
 
 // MODULE VARIABLES
@@ -16,13 +18,16 @@ const enum RowsToParse {
 
 // CLASS DEFINITION
 // ================================================================================================
-export class ArrayResult implements Result {
+export class ModelResult implements Result {
 
     command?            : string;
-    readonly rows       : any[];
+    readonly rows       : string[][];
+    readonly fields     : FieldDescriptor[];
+    private models      : Model[];
+    readonly modelClass : typeof Model;
+    readonly store      : Store;
+    readonly mutable    : boolean;
     readonly promise    : Promise<any>;
-    readonly fields     : FieldDescription[];
-    readonly parsers    : FieldParser[];
 
     private rowsToParse : RowsToParse;
     private resolve?    : (result?: any) => void;
@@ -30,10 +35,13 @@ export class ArrayResult implements Result {
 
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(mask: QueryMask) {
+    constructor(mask: QueryMask, mutable: boolean, modelClass: typeof Model, store: Store) {
         this.rows = [];
         this.fields = [];
-        this.parsers = [];
+        this.models = [];
+        this.modelClass = modelClass;
+        this.store = store;
+        this.mutable = mutable;
         this.rowsToParse = (mask === 'single') ? RowsToParse.one : RowsToParse.many;
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
@@ -56,9 +64,11 @@ export class ArrayResult implements Result {
     addFields(fieldDescriptions: FieldDescription[]) {
         for (let i = 0; i < fieldDescriptions.length; i++) {
             let desc = fieldDescriptions[i];
-            this.fields.push(desc);
-            let parser = getTypeParser(desc.dataTypeID, desc.format || 'text');
-            this.parsers.push(parser);
+            this.fields.push({
+                name    : desc.name,
+                oid     : desc.dataTypeID,
+                parser  : getTypeParser(desc.dataTypeID, desc.format || 'text')
+            });
         }
     }
 
@@ -72,25 +82,17 @@ export class ArrayResult implements Result {
                 return;
             }
         }
-
-        const row = [];
-        for (let i = 0; i < rowData.length; i++) {
-            let rawValue = rowData[i];
-            if (rawValue !== null) {
-                row.push(this.parsers[i](rawValue));
-            } else {
-                row.push(null);
-            }
-        }
-        this.rows.push(row);
+        
+        this.rows.push(rowData);
     }
 
     complete(command: string, rows: number) {
+        this.models = this.store.load(this.modelClass, this.rows, this.fields, this.mutable);
         this.command = command;
     }
 
     end(error?: Error) {
         if (error) this.reject!(error);
-        else this.resolve!(this.rowsToParse < RowsToParse.many ? this.rows[0] : this.rows);
+        else this.resolve!(this.rowsToParse < RowsToParse.many ? this.models[0] : this.models);
     }
 }

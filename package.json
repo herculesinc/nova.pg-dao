@@ -1,6 +1,6 @@
 {
   "name": "@nova/pg-dao",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "PostgreSQL data access object for Nova framework",
   "keywords": [
     "nova",
@@ -26,12 +26,15 @@
     "node": "10.15.x"
   },
   "dependencies": {
-    "@nova/core": "0.2.x",
+    "@nova/core": "0.3.x",
     "pg": "7.8.x"
   },
   "devDependencies": {
     "@types/chai": "4.1.x",
+<<<<<<< HEAD
     "@types/chai-as-promised": "^7.1.0",
+=======
+>>>>>>> v0.2
     "@types/mocha": "5.2.x",
     "@types/node": "10.12.x",
     "chai": "4.2.x",

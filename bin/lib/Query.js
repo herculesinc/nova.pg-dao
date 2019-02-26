@@ -10,27 +10,12 @@ const PARAM_PATTERN = /{{~?[a-z0-9_]+}}|\[\[~?[a-z0-9_]+\]\]/gi;
 // ================================================================================================
 var Query;
 (function (Query) {
-    function from(text, nameOrOptions, options) {
-        const validated = validateQueryArguments(text, nameOrOptions, options);
-        if (validated.options) {
-            return {
-                text: validated.text,
-                name: validated.name,
-                mask: validated.options.mask,
-                mode: validated.options.mode,
-                handler: validated.options.handler
-            };
-        }
-        else {
-            return {
-                text: validated.text,
-                name: validated.name
-            };
-        }
+    function from(text, nameOrOptions, maskOrOptions) {
+        return validateQueryArguments(text, nameOrOptions, maskOrOptions);
     }
     Query.from = from;
-    function template(text, nameOrOptions, options) {
-        const validated = validateQueryArguments(text, nameOrOptions, options);
+    function template(text, nameOrOptions) {
+        const validated = validateQueryArguments(text, nameOrOptions);
         const textParts = validated.text.split(PARAM_PATTERN);
         if (textParts.length < 2)
             throw new errors_1.QueryError('Query text must contain at least one parameter');
@@ -39,7 +24,7 @@ var Query;
         for (let match of paramMatches) {
             paramSpecs.push(buildParamSpec(match));
         }
-        return buildQueryTemplate(validated.name, textParts, paramSpecs, validated.options);
+        return buildQueryTemplate(validated.name, textParts, paramSpecs, validated.mask, validated.handler);
     }
     Query.template = template;
 })(Query = exports.Query || (exports.Query = {}));
@@ -60,7 +45,7 @@ function isResultQuery(query) {
 exports.isResultQuery = isResultQuery;
 // QUERY TEMPLATES
 // ================================================================================================
-function buildQueryTemplate(name, textParts, paramSpecs, options) {
+function buildQueryTemplate(name, textParts, paramSpecs, mask, handler) {
     return class ParameterizedQuery {
         constructor(params) {
             if (!params)
@@ -77,11 +62,8 @@ function buildQueryTemplate(name, textParts, paramSpecs, options) {
             this.name = name;
             this.text = text;
             this.values = values.length ? values : undefined;
-            if (options) {
-                this.mask = options.mask;
-                this.mode = options.mode;
-                this.handler = options.handler;
-            }
+            this.mask = mask;
+            this.handler = handler;
         }
     };
 }
@@ -186,6 +168,7 @@ function stringifySingleParam(value, values) {
         }
     }
 }
+exports.stringifySingleParam = stringifySingleParam;
 function stringifyRawArrayParam(array, values) {
     if (array === undefined || array === null)
         return 'null';
@@ -245,61 +228,89 @@ function stringifyArrayParam(array, values) {
     }
     return paramValues.join(',');
 }
+exports.stringifyArrayParam = stringifyArrayParam;
 // VALIDATORS
 // ================================================================================================
-function validateQueryArguments(text, nameOrOptions, options) {
+function validateQueryArguments(text, nameOrOptions, maskOrOptions) {
+    let qText, qName, qMask, qHandler;
+    // validate text
     if (typeof text !== 'string')
         throw new TypeError('Query text must be a string');
-    let qText = text.trim();
+    qText = text.trim();
     if (qText === '')
         throw new TypeError('Query text cannot be an empty string');
     qText += (qText.charAt(qText.length - 1) !== ';') ? ';\n' : '\n';
-    let qName;
-    let qOptions;
     if (typeof nameOrOptions === 'string') {
         qName = nameOrOptions.trim();
-        if (typeof qName !== 'string' || !qName)
+        if (qName === '')
             throw new TypeError('Query name must be a non-empty string');
-        if (options) {
-            qOptions = validateQueryOptions(options);
+        if (typeof maskOrOptions === 'string') {
+            qMask = validateQueryMask(maskOrOptions);
+        }
+        else if (typeof maskOrOptions === 'object') {
+            const validated = validateQueryOptions(maskOrOptions, false);
+            qMask = validated.mask;
+            qHandler = validated.handler;
+        }
+        else if (maskOrOptions !== undefined) {
+            throw new TypeError(`Query mask is invalid`);
         }
     }
     else if (typeof nameOrOptions === 'object') {
-        if (Array.isArray(nameOrOptions)) {
+        if (Array.isArray(nameOrOptions))
             throw new TypeError('Query name must be a string');
-        }
-        qName = 'unnamed query';
-        qOptions = validateQueryOptions(nameOrOptions);
+        if (maskOrOptions !== undefined)
+            throw new TypeError('Too many arguments provided');
+        const validated = validateQueryOptions(nameOrOptions, true);
+        qName = validated.name;
+        qMask = validated.mask;
+        qHandler = validated.handler;
     }
-    else if (nameOrOptions) {
-        throw new TypeError('Query name must be a string');
+    else if (nameOrOptions === undefined) {
+        qName = 'unnamed query';
     }
     else {
-        qName = 'unnamed query';
+        throw new TypeError('Query name must be a string');
     }
-    return { text: qText, name: qName, options: qOptions };
+    return { text: qText, name: qName, mask: qMask, handler: qHandler };
 }
-function validateQueryOptions({ mask, mode, handler }) {
+function validateQueryOptions(options, checkName) {
+    const mask = validateQueryMask(options.mask) || 'list';
+    let handler;
+    if (options.handler) {
+        handler = options.handler;
+        if (handler !== Object && handler !== Array) {
+            if (typeof handler !== 'object')
+                throw new TypeError('Query handler is invalid');
+            if (typeof handler.parse !== 'function')
+                throw new TypeError('Query handler is invalid');
+        }
+    }
+    else {
+        handler = Object;
+    }
+    let name;
+    if (checkName) {
+        if (typeof options.name === 'string') {
+            name = options.name.trim();
+            if (name === '')
+                throw new TypeError('Query name must be a non-empty string');
+        }
+        else if (options.name === undefined) {
+            name = 'unnamed query';
+        }
+        else {
+            throw new TypeError('Query name must be a string');
+        }
+    }
+    return { name, mask, handler };
+}
+function validateQueryMask(mask) {
     if (mask !== 'list' && mask !== 'single') {
         const ms = (typeof mask === 'object') ? JSON.stringify(mask) : mask;
         throw new TypeError(`Query mask '${ms}' is invalid`);
     }
-    if (mode === undefined) {
-        mode = 'object';
-    }
-    else {
-        if (mode !== 'object' && mode !== 'array') {
-            const ms = (typeof mode === 'object') ? JSON.stringify(mode) : mode;
-            throw new TypeError(`Query mode '${ms}' is invalid`);
-        }
-    }
-    if (handler) {
-        if (typeof handler !== 'object')
-            throw new TypeError('Query handler is invalid');
-        if (typeof handler.parse !== 'function')
-            throw new TypeError('Query handler is invalid');
-    }
-    return { mask, mode, handler };
+    return mask;
 }
 // UTILITY FUNCTIONS
 // ================================================================================================

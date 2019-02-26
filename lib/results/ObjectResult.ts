@@ -1,8 +1,8 @@
 // IMPORTS
 // ================================================================================================
 import { types } from 'pg';
-import { QueryMask } from '@nova/pg-dao';
-import { Result, FieldDescription, CommandComplete } from './index';
+import { QueryMask, FieldParser } from '@nova/pg-dao';
+import { Result, FieldDescription } from './index';
 
 // MODULE VARIABLES
 // ================================================================================================
@@ -10,7 +10,6 @@ const getTypeParser = types.getTypeParser;
 
 // INTERFACES
 // ================================================================================================
-type FieldParser = (value: string) => any;
 const enum RowsToParse {
     zero = 0, one = 1, many = 2
 };
@@ -19,13 +18,12 @@ const enum RowsToParse {
 // ================================================================================================
 export class ObjectResult implements Result {
 
-    readonly rows   : any[];
-    
-    readonly fields : FieldDescription[];
-    readonly parsers: FieldParser[];
-    readonly promise: Promise<any>;
+    command?            : string;
+    readonly rows       : any[];
+    readonly fields     : FieldDescription[];
+    readonly parsers    : FieldParser[];
+    readonly promise    : Promise<any>;
 
-    private complete    : boolean;
     private rowsToParse : RowsToParse;
     private resolve?    : (result?: any) => void;
     private reject?     : (error: Error) => void;
@@ -36,7 +34,6 @@ export class ObjectResult implements Result {
         this.rows = [];
         this.fields = [];
         this.parsers = [];
-        this.complete = false;
         this.rowsToParse = (mask === 'single') ? RowsToParse.one : RowsToParse.many;
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
@@ -47,7 +44,11 @@ export class ObjectResult implements Result {
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
     get isComplete(): boolean {
-        return this.complete;
+        return (this.command !== undefined);
+    }
+
+    get rowCount(): number {
+        return this.rows.length;
     }
 
     // PUBLIC METHODS
@@ -61,7 +62,7 @@ export class ObjectResult implements Result {
         }
     }
 
-    addRow(rowData: any[])  {
+    addRow(rowData: string[])  {
         // no need to parse more than 1 row for 'single' query mask
         if (this.rowsToParse < RowsToParse.many) {
             if (this.rowsToParse === RowsToParse.one) {
@@ -85,8 +86,8 @@ export class ObjectResult implements Result {
         this.rows.push(row);
     }
 
-    applyCommandComplete(command: CommandComplete) {
-        this.complete = true;
+    complete(command: string, rows: number) {
+        this.command = command;
     }
 
     end(error?: Error) {

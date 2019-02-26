@@ -4,6 +4,7 @@
         "module": "commonjs",
         "strict": true,
         "noEmitOnError": true,
+        "experimentalDecorators": true,
         "sourceMap": true,
         "rootDir": ".",
         "outDir": "bin"

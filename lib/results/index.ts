@@ -1,21 +1,26 @@
 // IMPORTS
 // ================================================================================================
-import { QueryMask, QueryMode, ResultHandler } from '@nova/pg-dao';
+import { QueryMask, QueryHandler, ResultHandler } from '@nova/pg-dao';
+import { isModelClass } from '../Model';
+import { Store } from '../Store';
 import { ArrayResult } from './ArrayResult';
 import { ObjectResult } from './ObjectResult';
 import { CustomResult } from './CustomResult';
+import { ModelResult } from './ModelResult';
 import { EmptyResult } from './EmptyResult';
 
 // INTERFACES
 // ================================================================================================
 export interface Result {
 
+    readonly command?   : string;
+    readonly rowCount   : number;
     readonly promise    : Promise<any>;
     readonly isComplete : boolean;
 
     addFields(fieldDescriptions: FieldDescription[]): void;
-    addRow(rowData: any[]): void;
-    applyCommandComplete(command: CommandComplete): void;
+    addRow(rowData: string[]): void;
+    complete(command: string, rows: number): void;
 
     end(error?: Error): void;
 }
@@ -30,31 +35,38 @@ export interface FieldDescription {
     format          : string;
 }
 
-export interface CommandComplete {
-    name            : 'commandComplete';
-    length          : number;
-    text            : string;
-}
-
 interface ResultOptions {
     mask?           : QueryMask;
-    mode?           : QueryMode;
-    handler?        : ResultHandler;
+    handler?        : QueryHandler;
+    mutable?        : boolean;
 }
 
 // PUBLIC FUNCTIONS
 // ================================================================================================
-export function createResult(options: ResultOptions): Result {
-    if (options.mode === 'array') {
-        return new ArrayResult(options.mask || 'list');
-    }
-    else if (options.mode === 'object') {
-        return new ObjectResult(options.mask || 'list');
-    }
-    else if (options.handler) {
-        return new CustomResult(options.mask || 'list', options.handler);
+export function createResult(options: ResultOptions, store: Store): Result {
+
+    if (options.handler) {
+        const handler = options.handler;
+        const mask = options.mask || 'list';
+        if (handler === Object) {
+            return new ObjectResult(mask);
+        }
+        else if (handler === Array) {
+            return new ArrayResult(mask);
+        }
+        else if (isModelClass(handler)) {
+            return new ModelResult(mask, options.mutable || false, handler, store);
+        }
+        else {
+            return new CustomResult(mask, handler as ResultHandler);
+        }
     }
     else {
-        return new EmptyResult();
+        if (options.mask) {
+            return new ObjectResult(options.mask);
+        }
+        else {
+            return new EmptyResult();
+        }
     }
 }

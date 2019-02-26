@@ -1,27 +1,22 @@
 // IMPORTS
 // ================================================================================================
-import { Result, FieldDescription, CommandComplete } from './index';
-
-// MODULE VARIABLES
-// ================================================================================================
-const matchRegexp = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/
+import { Result, FieldDescription } from './index';
 
 // CLASS DEFINITION
 // ================================================================================================
 export class EmptyResult implements Result {
 
-    oid?            : number;
-    command?        : string;
-    rowCount?       : number;
+    command?            : string;
+    rowCount            : number;
+    readonly promise    : Promise<any>;
 
-    readonly promise: Promise<any>;
-
-    private resolve?: (result?: any) => void;
-    private reject? : (error: Error) => void;
+    private resolve?    : (result?: any) => void;
+    private reject?     : (error: Error) => void;
 
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     constructor() {
+        this.rowCount = 0;
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
             this.reject = reject;
@@ -40,21 +35,13 @@ export class EmptyResult implements Result {
         // do nothing
     }
 
-    addRow(rowData: any[]): void {
+    addRow(rowData: string[]): void {
         // do nothing
     }
 
-    applyCommandComplete(command: CommandComplete) {
-        const match = matchRegexp.exec(command.text);
-        if (match) {
-            this.command = match[1];
-            if (match[3]) {
-                this.oid = Number.parseInt(match[2], 10);
-                this.rowCount = Number.parseInt(match[3], 10);
-            } else if (match[2]) {
-                this.rowCount = Number.parseInt(match[2], 10);
-            }
-        }
+    complete(command: string, rows: number) {
+        this.command = command;
+        this.rowCount = rows;
     }
 
     end(error?: Error) {

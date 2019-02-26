@@ -1,7 +1,12 @@
 // IMPORTS
 // ================================================================================================
-import { QueryMask, ResultHandler } from '@nova/pg-dao';
-import { Result, FieldDescription, CommandComplete } from './index';
+import { types } from 'pg';
+import { QueryMask, ResultHandler, FieldDescriptor } from '@nova/pg-dao';
+import { Result, FieldDescription } from './index';
+
+// MODULE VARIABLES
+// ================================================================================================
+const getTypeParser = types.getTypeParser;
 
 // INTERFACES
 // ================================================================================================
@@ -13,11 +18,12 @@ const enum RowsToParse {
 // ================================================================================================
 export class CustomResult implements Result {
 
-    readonly rows   : any[];
-    readonly promise: Promise<any>;
-    readonly handler: ResultHandler;
+    command?            : string;
+    readonly rows       : any[];
+    readonly fields     : FieldDescriptor[];
+    readonly promise    : Promise<any>;
+    readonly handler    : ResultHandler;
 
-    private complete    : boolean;
     private rowsToParse : RowsToParse;
     private resolve?    : (result?: any) => void;
     private reject?     : (error: Error) => void;
@@ -26,8 +32,8 @@ export class CustomResult implements Result {
     // --------------------------------------------------------------------------------------------
     constructor(mask: QueryMask, handler: ResultHandler) {
         this.rows = [];
+        this.fields = [];
         this.handler = handler;
-        this.complete = false;
         this.rowsToParse = (mask === 'single') ? RowsToParse.one : RowsToParse.many;
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
@@ -38,16 +44,27 @@ export class CustomResult implements Result {
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
     get isComplete(): boolean {
-        return this.complete;
+        return (this.command !== undefined);
+    }
+
+    get rowCount(): number {
+        return this.rows.length;
     }
 
     // PUBLIC METHODS
     // --------------------------------------------------------------------------------------------
     addFields(fieldDescriptions: FieldDescription[]) {
-        // do nothing
+        for (let i = 0; i < fieldDescriptions.length; i++) {
+            let desc = fieldDescriptions[i];
+            this.fields.push({
+                name    : desc.name,
+                oid     : desc.dataTypeID,
+                parser  : getTypeParser(desc.dataTypeID, desc.format || 'text')
+            });
+        }
     }
 
-    addRow(rowData: any[])  {
+    addRow(rowData: string[])  {
         // no need to parse more than 1 row for 'single' query mask
         if (this.rowsToParse < RowsToParse.many) {
             if (this.rowsToParse === RowsToParse.one) {
@@ -58,12 +75,12 @@ export class CustomResult implements Result {
             }
         }
         
-        const row = this.handler.parse(rowData);
+        const row = this.handler.parse(rowData, this.fields);
         this.rows.push(row);
     }
 
-    applyCommandComplete(command: CommandComplete) {
-        this.complete = true;
+    complete(command: string, rows: number) {
+        this.command = command;
     }
 
     end(error?: Error) {

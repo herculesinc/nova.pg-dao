@@ -9,13 +9,16 @@ const getTypeParser = pg_1.types.getTypeParser;
 ;
 // CLASS DEFINITION
 // ================================================================================================
-class ObjectResult {
+class ModelResult {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(mask) {
+    constructor(mask, mutable, modelClass, store) {
         this.rows = [];
         this.fields = [];
-        this.parsers = [];
+        this.models = [];
+        this.modelClass = modelClass;
+        this.store = store;
+        this.mutable = mutable;
         this.rowsToParse = (mask === 'single') ? 1 /* one */ : 2 /* many */;
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
@@ -35,9 +38,11 @@ class ObjectResult {
     addFields(fieldDescriptions) {
         for (let i = 0; i < fieldDescriptions.length; i++) {
             let desc = fieldDescriptions[i];
-            this.fields.push(desc);
-            let parser = getTypeParser(desc.dataTypeID, desc.format || 'text');
-            this.parsers.push(parser);
+            this.fields.push({
+                name: desc.name,
+                oid: desc.dataTypeID,
+                parser: getTypeParser(desc.dataTypeID, desc.format || 'text')
+            });
         }
     }
     addRow(rowData) {
@@ -50,28 +55,18 @@ class ObjectResult {
                 return;
             }
         }
-        const row = {};
-        for (let i = 0; i < rowData.length; i++) {
-            let rawValue = rowData[i];
-            let field = this.fields[i].name;
-            if (rawValue !== null) {
-                row[field] = this.parsers[i](rawValue);
-            }
-            else {
-                row[field] = null;
-            }
-        }
-        this.rows.push(row);
+        this.rows.push(rowData);
     }
     complete(command, rows) {
+        this.models = this.store.load(this.modelClass, this.rows, this.fields, this.mutable);
         this.command = command;
     }
     end(error) {
         if (error)
             this.reject(error);
         else
-            this.resolve(this.rowsToParse < 2 /* many */ ? this.rows[0] : this.rows);
+            this.resolve(this.rowsToParse < 2 /* many */ ? this.models[0] : this.models);
     }
 }
-exports.ObjectResult = ObjectResult;
-//# sourceMappingURL=ObjectResult.js.map
+exports.ModelResult = ModelResult;
+//# sourceMappingURL=ModelResult.js.map

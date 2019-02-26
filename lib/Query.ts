@@ -1,7 +1,7 @@
 // IMPORTS
 // ================================================================================================
 import {
-    QueryMode, QueryMask, QueryTemplate, ResultQuery, ResultQueryOptions, ResultHandler,
+    QueryHandler, QueryMask, QueryTemplate, ResultQuery, ResultQueryOptions,
     ListResultQuery, ListResultQueryOptions, SingleResultQuery, SingleResultQueryOptions
 } from '@nova/pg-dao';
 import { QueryError } from './errors';
@@ -17,10 +17,9 @@ const PARAM_PATTERN = /{{~?[a-z0-9_]+}}|\[\[~?[a-z0-9_]+\]\]/gi;
 export interface Query<T=any> {
     readonly text       : string;
     readonly name?      : string;
-    readonly mode?      : QueryMode;
     readonly mask?      : QueryMask;
     readonly values?    : any[];
-    readonly handler?   : ResultHandler<T>;
+    readonly handler?   : QueryHandler<T>;
 }
 
 interface ParamSpec {
@@ -34,38 +33,27 @@ export namespace Query {
 
     export function from(text: string): Query<void>
     export function from(text: string, name: string): Query<void>
-    export function from<T>(text: string, options: ListResultQueryOptions<T>): ListResultQuery<T>
-    export function from<T>(text: string, name: string, options: ListResultQueryOptions<T>): ListResultQuery<T>
-    export function from<T>(text: string, options: SingleResultQueryOptions<T>): SingleResultQuery<T>
-    export function from<T>(text: string, name: string, options: SingleResultQueryOptions<T>): SingleResultQuery<T>
-    export function from<T>(text: string, nameOrOptions?: string | ResultQueryOptions<T>, options?: ResultQueryOptions<T>): Query {
-        const validated = validateQueryArguments(text, nameOrOptions, options);
-        if (validated.options) {
-            return {
-                text    : validated.text,
-                name    : validated.name,
-                mask    : validated.options.mask,
-                mode    : validated.options.mode,
-                handler : validated.options.handler
-            };
-        }
-        else {
-            return {
-                text    : validated.text,
-                name    : validated.name
-            };
-        }
+    export function from<T=any>(text: string, name: string, mask: 'list'): ListResultQuery<T>
+    export function from<T=any>(text: string, name: string, options: ListResultQueryOptions<T>): ListResultQuery<T>
+    export function from<T=any>(text: string, options: ListResultQueryOptions<T>): ListResultQuery<T>
+    export function from<T=any>(text: string, name: string, mask: 'single'): SingleResultQuery<T>
+    export function from<T=any>(text: string, name: string, options: SingleResultQueryOptions<T>): SingleResultQuery<T>
+    export function from<T=any>(text: string, options: SingleResultQueryOptions<T>): SingleResultQuery<T>
+    export function from<T=any>(text: string, nameOrOptions?: string | ResultQueryOptions<T>, maskOrOptions?: QueryMask | ResultQueryOptions<T>): Query {
+        return validateQueryArguments(text, nameOrOptions, maskOrOptions);
     }
 
     export function template(text: string): QueryTemplate<Query<void>>
     export function template(text: string, name: string): QueryTemplate<Query<void>>
-    export function template<T>(text: string, options?: ListResultQueryOptions<T>): QueryTemplate<ListResultQuery<T>>
-    export function template<T>(text: string, name: string, options?: ListResultQueryOptions<T>): QueryTemplate<ListResultQuery<T>>
-    export function template<T>(text: string, options?: SingleResultQueryOptions<T>): QueryTemplate<SingleResultQuery<T>>
-    export function template<T>(text: string, name: string, options?: SingleResultQueryOptions<T>): QueryTemplate<SingleResultQuery<T>>
-    export function template<T>(text: string, nameOrOptions?: string | ResultQueryOptions<T>, options?: ResultQueryOptions<T>): QueryTemplate<any> {
+    export function template<T=any>(text: string, name: string, mask: 'list'): QueryTemplate<ListResultQuery<T>>
+    export function template<T=any>(text: string, name: string, options: ListResultQueryOptions<T>): QueryTemplate<ListResultQuery<T>>
+    export function template<T=any>(text: string, options: ListResultQueryOptions<T>): QueryTemplate<ListResultQuery<T>>
+    export function template<T=any>(text: string, name: string, mask: 'single'): QueryTemplate<SingleResultQuery<T>>
+    export function template<T=any>(text: string, name: string, options: SingleResultQueryOptions<T>): QueryTemplate<SingleResultQuery<T>>
+    export function template<T=any>(text: string, options: SingleResultQueryOptions<T>): QueryTemplate<SingleResultQuery<T>>
+    export function template<T=any>(text: string, nameOrOptions?: string | ResultQueryOptions<T>): QueryTemplate<any> {
 
-        const validated = validateQueryArguments(text, nameOrOptions, options);
+        const validated = validateQueryArguments(text, nameOrOptions);
         const textParts = validated.text.split(PARAM_PATTERN);
         if (textParts.length < 2) throw new QueryError('Query text must contain at least one parameter');
 
@@ -75,7 +63,7 @@ export namespace Query {
             paramSpecs.push(buildParamSpec(match));
         }
 
-        return buildQueryTemplate(validated.name, textParts, paramSpecs, validated.options);
+        return buildQueryTemplate(validated.name, textParts, paramSpecs, validated.mask, validated.handler);
     }
 }
 
@@ -96,16 +84,15 @@ export function isResultQuery(query: Query): query is ResultQuery {
 
 // QUERY TEMPLATES
 // ================================================================================================
-function buildQueryTemplate<T>(name: string, textParts: string[], paramSpecs: ParamSpec[], options?: ResultQueryOptions<T>): QueryTemplate<any> {
+function buildQueryTemplate<T>(name: string, textParts: string[], paramSpecs: ParamSpec[], mask?: QueryMask, handler?: QueryHandler): QueryTemplate<any> {
 
     return class ParameterizedQuery implements Query<T> {
 
         readonly name       : string;
-        readonly mode?      : QueryMode;
         readonly mask?      : QueryMask;
         readonly text       : string;
         readonly values?    : any[];
-        readonly handler?   : ResultHandler<T>;
+        readonly handler?   : QueryHandler<T>;
 
         constructor(params: any) {
             if (!params) throw new TypeError('Query params are undefined');
@@ -122,11 +109,8 @@ function buildQueryTemplate<T>(name: string, textParts: string[], paramSpecs: Pa
             this.name = name;
             this.text = text;
             this.values = values.length ? values : undefined;
-            if (options) {
-                this.mask = options.mask;
-                this.mode = options.mode;
-                this.handler = options.handler;
-            }
+            this.mask = mask;
+            this.handler = handler;
         }
     };
 }
@@ -165,23 +149,23 @@ function stringifyRawSingleParam(value: any, values: string[]) {
 
     switch (typeof value) {
         case 'string': {
-            return value;
-        }
+        return value;
+    }
         case 'number': case 'bigint': {
             return value.toString(10);
         }
         case 'boolean': {
-            return value.toString();
-        }
+        return value.toString();
+    }
         default: {
             const pvalue = value.valueOf();
             switch (typeof pvalue) {
                 case 'string': {
                     return pvalue;
-                }
+    }
                 case 'number': case 'bigint': {
                     return pvalue.toString(10);
-                }
+}
                 case 'boolean': {
                     return pvalue.toString();
                 }                
@@ -193,7 +177,7 @@ function stringifyRawSingleParam(value: any, values: string[]) {
     }
 }
 
-function stringifySingleParam(value: any, values: string[]): string {
+export function stringifySingleParam(value: any, values: string[]): string {
     if (value === undefined || value === null) return 'null';
 
     switch (typeof value) {
@@ -262,7 +246,7 @@ function stringifyRawArrayParam(array: any[], values: string[]): string {
     return paramValues.join(',');
 }
 
-function stringifyArrayParam(array: any[], values: string[]): string {
+export function stringifyArrayParam(array: any[], values: string[]): string {
     if (array === undefined || array === null) return 'null';
     if (!Array.isArray(array)) throw new Error('Query parameter must be an array');
     if (array.length === 0) return 'null';
@@ -297,60 +281,88 @@ function stringifyArrayParam(array: any[], values: string[]): string {
 
 // VALIDATORS
 // ================================================================================================
-function validateQueryArguments(text: string, nameOrOptions?: string | ResultQueryOptions, options?: ResultQueryOptions) {
+function validateQueryArguments(text: string, nameOrOptions?: string | ResultQueryOptions, maskOrOptions?: QueryMask | ResultQueryOptions) {
+    let qText: string, qName: string, qMask: QueryMask | undefined, qHandler: QueryHandler | undefined;
+
+    // validate text
     if (typeof text !== 'string') throw new TypeError('Query text must be a string');
-    let qText = text.trim();
+    qText = text.trim();
     if (qText === '') throw new TypeError('Query text cannot be an empty string');
     qText += (qText.charAt(qText.length - 1) !== ';') ? ';\n' : '\n';
 
-    let qName: string;
-    let qOptions: ResultQueryOptions | undefined;
     if (typeof nameOrOptions === 'string') {
         qName = nameOrOptions.trim();
-        if (typeof qName !== 'string' || !qName) throw new TypeError('Query name must be a non-empty string');
-        if (options) {
-            qOptions = validateQueryOptions(options);
+        if (qName === '') throw new TypeError('Query name must be a non-empty string');
+        if (typeof maskOrOptions === 'string') {
+            qMask = validateQueryMask(maskOrOptions);
         }
+        else if (typeof maskOrOptions === 'object') {
+            const validated = validateQueryOptions(maskOrOptions, false);
+            qMask = validated.mask;
+            qHandler = validated.handler;
+        }
+        else if (maskOrOptions !== undefined) {
+            throw new TypeError(`Query mask is invalid`);
+        }
+
     }
     else if (typeof nameOrOptions === 'object') {
-        if (Array.isArray(nameOrOptions)) {
-            throw new TypeError('Query name must be a string');
-        }
-        qName = 'unnamed query';
-        qOptions = validateQueryOptions(nameOrOptions);
+        if (Array.isArray(nameOrOptions)) throw new TypeError('Query name must be a string');
+        if (maskOrOptions !== undefined) throw new TypeError('Too many arguments provided');
+        const validated = validateQueryOptions(nameOrOptions, true);
+        qName = validated.name!;
+        qMask = validated.mask;
+        qHandler = validated.handler;
     }
-    else if (nameOrOptions) {
-        throw new TypeError('Query name must be a string');
+    else if (nameOrOptions === undefined) {
+        qName = 'unnamed query';
     }
     else {
-        qName = 'unnamed query';
+        throw new TypeError('Query name must be a string');
     }
 
-    return { text: qText, name: qName, options: qOptions };
+    return { text: qText, name: qName, mask: qMask, handler: qHandler };
 }
 
-function validateQueryOptions({ mask, mode, handler}: ResultQueryOptions) {
+function validateQueryOptions(options: ResultQueryOptions, checkName: boolean) {
+
+    const mask = validateQueryMask(options.mask) || 'list';
+
+    let handler: QueryHandler;
+    if (options.handler) {
+        handler = options.handler;
+        if (handler !== Object && handler !== Array) {
+            if (typeof handler !== 'object') throw new TypeError('Query handler is invalid');
+            if (typeof handler.parse !== 'function') throw new TypeError('Query handler is invalid');
+        }
+    }
+    else {
+        handler = Object;
+    }
+
+    let name: string | undefined;
+    if (checkName) {
+        if (typeof options.name === 'string') {
+            name = options.name.trim();
+            if (name === '') throw new TypeError('Query name must be a non-empty string');
+        }
+        else if (options.name === undefined) {
+            name = 'unnamed query';    
+        }
+        else {
+            throw new TypeError('Query name must be a string');
+        }
+    }
+
+    return { name, mask, handler };
+}
+
+function validateQueryMask(mask: QueryMask) {
     if (mask !== 'list' && mask !== 'single') {
         const ms = (typeof mask === 'object') ? JSON.stringify(mask) : mask;
         throw new TypeError(`Query mask '${ms}' is invalid`);
     }
-
-    if (mode === undefined) {
-        mode = 'object';
-    }
-    else {
-        if (mode !== 'object' && mode !== 'array') {
-            const ms = (typeof mode === 'object') ? JSON.stringify(mode) : mode;
-            throw new TypeError(`Query mode '${ms}' is invalid`);
-        }
-    }
-
-    if (handler) {
-        if (typeof handler !== 'object') throw new TypeError('Query handler is invalid');
-        if (typeof handler.parse !== 'function') throw new TypeError('Query handler is invalid');
-    }
-
-    return { mask, mode, handler };
+    return mask;
 }
 
 // UTILITY FUNCTIONS

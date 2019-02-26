@@ -1,7 +1,10 @@
 // IMPORTS
 // ================================================================================================
 import { Database, Query } from '../index';
-import { ListResultQueryOptions, SingleResultQueryOptions } from '@nova/pg-dao';
+import { ListResultQueryOptions, SingleResultQueryOptions, ResultHandler, FieldHandler } from '@nova/pg-dao';
+import { Model } from '../lib/Model';
+import { dbModel, dbField } from '../lib/schema/decorators';
+import { PgIdGenerator } from '../lib/schema/idGenerators';
 
 // MODULE VARIABLES
 // ================================================================================================
@@ -24,6 +27,13 @@ const singleQueryOptions: SingleResultQueryOptions<string> = {
         parse   : extractId
     }
 };
+
+const IdHandler: ResultHandler<string> = {
+    
+    parse(rowData) {
+        return rowData[0];
+    }
+}
 
 function extractId(row: any): string {
     return row.id;
@@ -63,6 +73,36 @@ function extractId(row: any): string {
     const template4 = Query.template(paramQueryText4, 'template4', listQueryOptions);
     const query8 = new template4({ id: ["123", "456"] });
     console.log(JSON.stringify(query8));
+});
+
+// MODEL TESTS
+// ================================================================================================
+interface Password {
+    value: string;
+}
+
+const Password: FieldHandler = {
+    clone(pwd: Password) { return pwd; },
+    areEqual(pwd1: Password, pwd2: Password) { return pwd1 === pwd2; }
+};
+
+@dbModel('accounts', new PgIdGenerator('accounts_seq'))
+class Account extends Model {
+
+    @dbField(String)
+    username!: string;
+
+    @dbField(Object, { handler: Password })
+    password!: Password;
+}
+
+(function modelTests() {
+
+    console.log(JSON.stringify(Account.getSchema()));
+    const qSelectAccounts = Account.SelectQuery('list');
+    console.log(new qSelectAccounts(false, { id: '123' }).text);
+    console.log(new qSelectAccounts(true,  { id: '234' }).text);
+
 })();
 
 // DATABASE TESTS
@@ -82,14 +122,23 @@ const database = new Database({
 
     const session = database.getSession();
 
-    const query1 = Query.from('SELECT id FROM tokens LIMIT 5;', { mask: 'list' })
-    const result1 = await session.execute(query1);
-    console.log(JSON.stringify(result1));
+    const query1 = Query.from('SELECT id FROM tokens LIMIT 5;', { name: 'query1', mask: 'list', handler: IdHandler })
+    const result1 = session.execute(query1);
 
-    const template1 = Query.template('SELECT id, status, handle FROM accounts WHERE profile = {{profile}} LIMIT 5', { mask: 'list' });
-    const query2 = new template1({ profile: `test's` });
-    const result2 = await session.execute(query2);
-    console.log(JSON.stringify(result2));
+    const query2 = Query.from('SELECT status FROM tokens LIMIT 5;', 'query2', { mask: 'list' })
+    const result2 = session.execute(query2);
 
-    await session.close('commit');
+    const template1 = Query.template('SELECT id, status, handle FROM accounts WHERE profile = {{profile}};', 'query3', 'single');
+    const query3 = new template1({ profile: `test's` });
+    const result3 = session.execute(query3);
+
+    try {
+        const results = await Promise.all([result1, result2, result3 ]);
+        console.log(JSON.stringify(results));
+        
+        await session.close('commit');
+    }
+    catch (error) {
+        console.error(error);
+    }
 });

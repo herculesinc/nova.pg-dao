@@ -5,7 +5,7 @@ declare module "@nova/pg-dao" {
     import { EventEmitter } from 'events';
 
     import { Dao, Logger, TraceSource, Exception } from '@nova/core';
-    export { Dao, Logger, TraceSource, TraceCommand } from '@nova/core';
+    export { Logger, TraceSource, TraceCommand } from '@nova/core';
 
     // DATABASE
     // --------------------------------------------------------------------------------------------
@@ -32,8 +32,8 @@ declare module "@nova/pg-dao" {
     }
 
     export interface PoolState {
-        size    : number;
-        idle    : number;
+        readonly size   : number;
+        readonly idle   : number;
     }
 
     export interface SessionOptions {
@@ -55,85 +55,197 @@ declare module "@nova/pg-dao" {
 
     // DAO
     // --------------------------------------------------------------------------------------------
-    export interface DaoSession extends Dao {
+    export interface DaoSession {
 
         readonly inTransaction  : boolean;
+        readonly isActive       : boolean;
+        readonly isReadOnly     : boolean;
         
-        execute<T>(query: SingleResultQuery<T>) : Promise<T>;
+        execute<T>(query: SingleResultQuery<T>) : Promise<T | undefined>;
         execute<T>(query: ListResultQuery<T>)   : Promise<T[]>;
         execute(query: Query<void>)             : Promise<void>;
+
+        close(action: 'commit' | 'rollback'): Promise<any>;
     }
 
     // RESULT HANDLER
     // --------------------------------------------------------------------------------------------
     export interface ResultHandler<T=any> {
-        parse(row: any): T;
+        parse(rowData: string[], fields?: FieldDescriptor[]): T;
+    }
+
+    export interface FieldParser {
+        (value: string): any;
+    }
+
+    export interface FieldDescriptor {
+        readonly name       : string;
+        readonly oid        : number;
+        readonly parser     : FieldParser;
     }
 
     // QUERY
     // --------------------------------------------------------------------------------------------
     export type QueryMask = 'list' | 'single';
-    export type QueryMode = 'object' | 'array';
+    export type QueryHandler<T=any> = typeof Object | typeof Array | typeof Model | ResultHandler<T>;
 
     export interface Query<T=any> {
         readonly text       : string;
         readonly name?      : string;
-        readonly mode?      : QueryMode;
         readonly mask?      : QueryMask;
         readonly values?    : any[];
-        readonly handler?   : ResultHandler<T>;
+        readonly handler?   : QueryHandler<T>;
     }
 
     export const Query: {
         from(text: string): Query<void>;
         from(text: string, name: string): Query<void>;
-        from<T>(text: string, options?: ListResultQueryOptions<T>): ListResultQuery<T>;
-        from<T>(text: string, name: string, options?: ListResultQueryOptions<T>): ListResultQuery<T>;
-        from<T>(text: string, options?: SingleResultQueryOptions<T>): SingleResultQuery<T>;
-        from<T>(text: string, name: string, options?: SingleResultQueryOptions<T>): SingleResultQuery<T>;
+        from<T=any>(text: string, name: string, mask: 'list'): ListResultQuery<T>;        
+        from<T=any>(text: string, name: string, options: ListResultQueryOptions<T>): ListResultQuery<T>;
+        from<T=any>(text: string, options: ListResultQueryOptions<T>): ListResultQuery<T>;
+        from<T=any>(text: string, name: string, mask: 'single'): SingleResultQuery<T>;
+        from<T=any>(text: string, name: string, options: SingleResultQueryOptions<T>): SingleResultQuery<T>;
+        from<T=any>(text: string, options: SingleResultQueryOptions<T>): SingleResultQuery<T>;
 
         template(text: string): QueryTemplate<Query<void>>;
         template(text: string, name: string): QueryTemplate<Query<void>>;
-        template<T>(text: string, options?: ListResultQueryOptions<T>): QueryTemplate<ListResultQuery<T>>;
-        template<T>(text: string, name: string, options?: ListResultQueryOptions<T>): QueryTemplate<ListResultQuery<T>>;
-        template<T>(text: string, options?: SingleResultQueryOptions<T>): QueryTemplate<SingleResultQuery<T>>;
-        template<T>(text: string, name: string, options?: SingleResultQueryOptions<T>): QueryTemplate<SingleResultQuery<T>>;
+        template<T=any>(text: string, name: string, mask: 'list'): QueryTemplate<ListResultQuery<T>>;
+        template<T=any>(text: string, name: string, options: ListResultQueryOptions<T>): QueryTemplate<ListResultQuery<T>>;
+        template<T=any>(text: string, options: ListResultQueryOptions<T>): QueryTemplate<ListResultQuery<T>>;
+        template<T=any>(text: string, name: string, mask: 'single'): QueryTemplate<SingleResultQuery<T>>;
+        template<T=any>(text: string, name: string, options: SingleResultQueryOptions<T>): QueryTemplate<SingleResultQuery<T>>;
+        template<T=any>(text: string, options: SingleResultQueryOptions<T>): QueryTemplate<SingleResultQuery<T>>;
     }
     
     export interface ResultQuery<T=any> extends Query<T> {
         readonly mask       : QueryMask;
-        readonly mode?      : QueryMode;
-        readonly handler?   : ResultHandler<T>;
+        readonly handler    : QueryHandler<T>;
     }
     
     export interface SingleResultQuery<T=any> extends ResultQuery<T> {
         readonly mask       : 'single';
     }
     
-    export interface ListResultQuery<T> extends ResultQuery<T> {
+    export interface ListResultQuery<T=any> extends ResultQuery<T> {
         readonly mask       : 'list';
     }
     
     export interface ResultQueryOptions<T=any> {
+        readonly name?      : string;
         readonly mask       : QueryMask;
-        readonly mode?      : QueryMode;
-        readonly handler?   : ResultHandler<T>;
+        readonly handler?   : QueryHandler<T>;
     }
     
     export interface SingleResultQueryOptions<T=any> extends ResultQueryOptions<T> {
         readonly mask       : 'single';
-        readonly mode?      : QueryMode;
-        readonly handler?   : ResultHandler<T>;
+        readonly handler?   : QueryHandler<T>;
     }
     
     export interface ListResultQueryOptions<T=any> extends ResultQueryOptions<T> {
         readonly mask       : 'list';
-        readonly mode?      : QueryMode;
-        readonly handler?   : ResultHandler<T>;
+        readonly handler?   : QueryHandler<T>;
     }
     
     export interface QueryTemplate<T extends Query> {
         new(params: object): T;
+    }
+
+    // DATABASE SCHEMA
+    // --------------------------------------------------------------------------------------------
+    export type Timestamp = number;
+    export namespace Timestamp {
+        export function parse(value: any): Timestamp | undefined;
+    }
+
+    export type DbFieldType = typeof Number | typeof String | typeof Boolean | typeof Timestamp | typeof Date | typeof Object | typeof Array;
+
+    export type Parser<T=any> = (value: string) => T;
+    export type Serializer = (value: any) => string;
+    export type Cloner<T=any> = (value: T) => T;
+    export type Comparator = (value1: any, value2: any) => boolean;
+
+    export interface FieldHandler {
+        parse?      : Parser;
+        serialize?  : Serializer;
+        clone       : Cloner;
+        areEqual    : Comparator;
+    }
+
+    export interface DbField {
+        readonly name		: string;
+        readonly snakeName	: string;
+        readonly type		: DbFieldType;
+        readonly readonly	: boolean;
+        readonly areEqual?	: Comparator;
+        readonly clone?		: Cloner;
+        readonly parse?     : Parser;
+        readonly serialize? : Serializer;
+    }
+
+    export interface DbFieldConfig {
+        type		: DbFieldType;
+        readonly?	: boolean;
+        handler?	: FieldHandler;
+    }
+
+    export interface FieldMap {
+        [fieldName: string]: DbFieldConfig;
+    }
+
+    export interface DbSchema {
+        readonly name           : string;
+        readonly table          : string;
+        readonly idGenerator	: IdGenerator;
+        readonly fields		    : ReadonlyArray<DbField>;
+
+        hasField(fieldName: string) : boolean;
+        getField(fieldNam: string)  : DbField | undefined;
+    }
+
+    export interface IdGenerator {
+        getNextId(dao?: DaoSession): Promise<string>;
+    }
+
+    // MODELS
+    // --------------------------------------------------------------------------------------------
+    export class Model {
+
+        constructor(seed: object, deepCopy?: boolean);
+        constructor(rowData: string[], fields: FieldDescriptor[]);
+
+        readonly id         : string;
+        readonly createdOn  : number;
+        readonly updatedOn  : number;
+
+        infuse(rowData: string[], fields: FieldDescriptor[]): void;
+        getSyncQueries(): Query[];
+
+        isMutable(): boolean;
+        isCreated(): boolean;
+        isDeleted(): boolean;
+        isModified(): boolean;
+
+        static SelectQuery<T extends typeof Model>(this: T, mask: 'list'): SelectAllModelsQuery<InstanceType<T>>;
+        static SelectQuery<T extends typeof Model>(this: T, mask: 'single'): SelectOneModelQuery<InstanceType<T>>;
+
+        static setSchema(table: string, idGenerator: IdGenerator, fields: FieldMap): DbSchema;
+        static getSchema(): DbSchema;
+    }
+
+    export interface SelectOneModelQuery<T=any> {
+        new(mutable: boolean, selector?: object): SingleResultQuery<T> & ModelQueryInstance;
+    }
+    
+    export interface SelectAllModelsQuery<T=any> {
+        new(mutable: boolean, selector?: object): ListResultQuery<T> & ModelQueryInstance;
+    }
+
+    interface ModelQueryInstance {
+        readonly mutable    : boolean;
+        readonly select     : string;
+        from                : string;
+        where?              : string;
+        readonly paramValues: any[];
     }
 
     // ERROR CLASSES
@@ -149,6 +261,11 @@ declare module "@nova/pg-dao" {
     }
 
     export class ParseError extends Exception {
+        constructor(cause: Error);
+	    constructor(message: string, cause?: Error);
+    }
+
+    export class ModelError extends Exception {
         constructor(cause: Error);
 	    constructor(message: string, cause?: Error);
     }

@@ -42,3 +42,16 @@ export class ParseError extends Exception {
 		}
 	}
 }
+
+export class ModelError extends Exception {
+	constructor(cause: Error);
+	constructor(message: string, cause?: Error)
+	constructor(messageOrCause: string | Error, cause?: Error) {
+		if (typeof messageOrCause === 'string') {
+			super({ name: 'Model Error', message: messageOrCause, cause })
+		}
+		else {
+			super({ name: 'Model Error', cause: messageOrCause })
+		}
+	}
+}
