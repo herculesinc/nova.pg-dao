@@ -31,19 +31,20 @@ export function dbModel(table: string, idGenerator: IdGenerator): ClassDecorator
         const schemaMap: Map<string, any> = classConstructor.prototype[symFields];
         const fields = schemaMap.get(classConstructor.name);
         classConstructor.setSchema(table, idGenerator, fields);
-    }
+    };
 }
 
 export function dbField(fieldType: DbFieldType, options?: dbFieldOptions): PropertyDecorator {
     // make sure options are set
     options = { readonly: false , ...options };
 
-    return function (classPrototype: any, property: string) {
+    return function (classPrototype: any, property: string | symbol) {
+        if (typeof property === 'symbol') throw new ModelError('A symbol property cannot be a part of model schema');
         const field = new DbField(property, fieldType, options!.readonly, options!.handler);
         
         let schemaMap: Map<string, any> = classPrototype[symFields];
         if (!schemaMap) {
-            schemaMap = new Map<string, any>();
+            schemaMap = new Map();
             classPrototype[symFields] = schemaMap; 
         }
         
@@ -53,5 +54,5 @@ export function dbField(fieldType: DbFieldType, options?: dbFieldOptions): Prope
             schemaMap.set(classPrototype.constructor.name, schema);
         }
         schema[property] = field;
-    } as PropertyDecorator;
+    };
 }

@@ -209,7 +209,7 @@ class Model {
     buildInsertQuery() {
         const schema = this.constructor.getSchema();
         const qInsertModel = this.constructor.qInsertModel;
-        // make sure fields with custom serialization are treaded correctly
+        // make sure fields with custom serialization are treated correctly
         if (schema.hasCustomSerializers) {
             const params = {};
             for (let field of schema.fields) {

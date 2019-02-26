@@ -29,6 +29,8 @@ function dbField(fieldType, options) {
     // make sure options are set
     options = Object.assign({ readonly: false }, options);
     return function (classPrototype, property) {
+        if (typeof property === 'symbol')
+            throw new errors_1.ModelError('A symbol property cannot be a part of model schema');
         const field = new DbField_1.DbField(property, fieldType, options.readonly, options.handler);
         let schemaMap = classPrototype[symFields];
         if (!schemaMap) {
