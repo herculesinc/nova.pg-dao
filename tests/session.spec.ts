@@ -199,7 +199,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(result3!.username).to.equal('George');
             });
 
-            it('Two parameterized queries in a row (P-P) should produce correct result', async () => {
+            it('Two parameterized queries in a row (N-P-P-N) should produce correct result', async () => {
                 const query1 = Query.from('SELECT * FROM tmp_users WHERE id = 1;','query1', 'single');
 
                 const Template2 = Query.template<User>('SELECT * FROM tmp_users WHERE username = {{username}};', {mask: 'single'});
@@ -242,7 +242,6 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
                 const query2 = Query.from('SELECT * FROM tmp_users WHERE id = 1;','query1', 'single');
                 const query3 = Query.from('SELECT * FROM tmp_users WHERE id = 2;','query2', 'single');
-
                 const query4 = Query.from('SELECT * FROM tmp_users WHERE id = 3;','query4', 'single');
 
                 const [result1, result2, result3, result4] = await Promise.all([session.execute(query1), session.execute(query2), session.execute(query3), session.execute(query4)]);
@@ -256,7 +255,6 @@ describe('NOVA.PG-DAO -> Session;', () => {
             it('Mix of parameterized and non-parameterized queries (N-N-N-P) should produce correct result', async () => {
                 const query1 = Query.from('SELECT * FROM tmp_users WHERE id = 1;','query1', 'single');
                 const query2 = Query.from('SELECT * FROM tmp_users WHERE id = 2;','query2', 'single');
-
                 const query3 = Query.from('SELECT * FROM tmp_users WHERE id = 3;','query4', 'single');
 
                 const Template = Query.template<User>('SELECT * FROM tmp_users WHERE username = {{username}};', {mask: 'single'});
@@ -270,7 +268,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(result4!.username).to.equal('T\'est');
             });
 
-            it('Mix of parameterized and non-parameterized queries (P-N-N-P) should produce correct result', async () => { //todo change to match description
+            it('Mix of parameterized and non-parameterized queries (N-N) should produce correct result', async () => { //todo change to match description
                 const query1 = Query.from('SELECT * FROM tmp_users WHERE id IN (1,2);', {mask: 'list'});
                 const query2 = Query.from('SELECT * FROM tmp_users WHERE id IN (3);', {mask: 'list'});
 
@@ -280,7 +278,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(result2).to.have.length(1);
             });
 
-            it('Mix of parameterized and non-parameterized queries (P-N-P-N) should produce correct result', async () => { //todo change to match description
+            it('Mix of parameterized and non-parameterized queries (N-N-N) should produce correct result', async () => { //todo change to match description
                 const query1 = Query.from('SELECT * FROM tmp_users WHERE id = 1;', {mask: 'single'});
                 const query2 = Query.from('SELECT * FROM tmp_users WHERE id = 3;', {mask: 'single'});
                 const query3 = Query.from('SELECT * FROM tmp_users WHERE id = 3;', 'test', 'single');

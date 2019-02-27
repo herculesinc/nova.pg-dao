@@ -1,4 +1,4 @@
-// IMPORTS 
+// IMPORTS
 // ================================================================================================
 import { IdGenerator, FieldHandler, DbFieldType } from '@nova/pg-dao';
 import { ModelError } from '../errors';
@@ -26,7 +26,7 @@ export function dbModel(table: string, idGenerator: IdGenerator): ClassDecorator
 	if (!idGenerator) throw new ModelError('Cannot build model schema: ID Generator is undefined');
 	if (typeof idGenerator.getNextId !== 'function')
 		throw new ModelError('Cannot build model schema: ID Generator is invalid');
-        
+
     return function (classConstructor: any) {
         const schemaMap: Map<string, any> = classConstructor.prototype[symFields];
         const fields = schemaMap.get(classConstructor.name);
@@ -41,13 +41,13 @@ export function dbField(fieldType: DbFieldType, options?: dbFieldOptions): Prope
     return function (classPrototype: any, property: string | symbol) {
         if (typeof property === 'symbol') throw new ModelError('A symbol property cannot be a part of model schema');
         const field = new DbField(property, fieldType, options!.readonly, options!.handler);
-        
+
         let schemaMap: Map<string, any> = classPrototype[symFields];
         if (!schemaMap) {
             schemaMap = new Map();
-            classPrototype[symFields] = schemaMap; 
+            classPrototype[symFields] = schemaMap;
         }
-        
+
         let schema = schemaMap.get(classPrototype.constructor.name);
         if (!schema) {
             schema = {};
