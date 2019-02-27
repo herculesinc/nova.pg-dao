@@ -153,7 +153,7 @@ class DaoSession {
                     const queries = this.store.getSyncQueries();
                     if (queries.length > 0) {
                         if (this.isReadOnly)
-                            throw new errors_1.ConnectionError('Cannot close session: dirty models detected in read-only session');
+                            throw new errors_1.ConnectionError('Dirty models detected in read-only session');
                         for (let query of queries) {
                             flushPromises.push(this.execute(query));
                         }
@@ -178,7 +178,7 @@ class DaoSession {
             this.store.applyChanges();
         }
         catch (error) {
-            closeError = new errors_1.ConnectionError(`Cannot close session`, error);
+            closeError = new errors_1.ConnectionError(`Error while closing session`, error);
         }
         this.releaseClient(closeError);
         if (closeError)

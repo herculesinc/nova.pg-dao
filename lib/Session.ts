@@ -1,11 +1,11 @@
 // IMPORTS
 // ================================================================================================
 import { Dao } from '@nova/core';
-import { Query, SingleResultQuery, ListResultQuery, SessionOptions, Logger, TraceSource } from '@nova/pg-dao';
+import { Model, Query, SingleResultQuery, ListResultQuery, SessionOptions, Logger, TraceSource } from '@nova/pg-dao';
 import { Client } from 'pg';
 import { Command } from './Command';
 import { Store } from './Store';
-import { Model, isModelClass } from './Model';
+import { isModelClass } from './Model';
 import { ConnectionError } from './errors';
 
 // INTERFACES AND ENUMS
@@ -70,11 +70,11 @@ export class DaoSession implements Dao {
     // MODEL METHODS
     // --------------------------------------------------------------------------------------------
     getOne<T extends typeof Model>(type: T, id: string): InstanceType<T> | undefined {
-        return this.store.get(type, id);
+        return this.store.get(type as any, id);
     }
 
     getAll<T extends typeof Model>(type: T): ReadonlyMap<string, InstanceType<T>> {
-        return this.store.getAll(type);
+        return this.store.getAll(type as any);
     }
 
     async fetchOne<T extends typeof Model>(type: T, selector: object, forUpdate?: boolean): Promise<InstanceType<T> | undefined> {
@@ -151,7 +151,7 @@ export class DaoSession implements Dao {
             throw new ConnectionError('Cannot delete model: session is read-only');
         }
 
-        this.store.delete(model);
+        this.store.delete(model as any);
         return model;
     }
 
@@ -204,7 +204,7 @@ export class DaoSession implements Dao {
                 if (this.checkImmutable || !this.isReadOnly) {
                     const queries = this.store.getSyncQueries();
                     if (queries.length > 0) {
-                        if (this.isReadOnly) throw new ConnectionError('Cannot close session: dirty models detected in read-only session');
+                        if (this.isReadOnly) throw new ConnectionError('Dirty models detected in read-only session');
                         for (let query of queries) {
                             flushPromises.push(this.execute(query));
                         }
@@ -231,7 +231,7 @@ export class DaoSession implements Dao {
             this.store.applyChanges();
         }
         catch (error) {
-            closeError = new ConnectionError(`Cannot close session`, error);
+            closeError = new ConnectionError(`Error while closing session`, error);
         }
 
         this.releaseClient(closeError);

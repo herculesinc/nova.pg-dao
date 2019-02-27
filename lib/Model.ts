@@ -1,6 +1,6 @@
 // IMPORTS
 // ================================================================================================
-import { FieldDescriptor, Query, SelectAllModelsQuery, SelectOneModelQuery, IdGenerator, FieldMap, QueryMask } from '@nova/pg-dao';
+import { Model as IModel, FieldDescriptor, Query, SelectAllModelsQuery, SelectOneModelQuery, IdGenerator, FieldMap, QueryMask } from '@nova/pg-dao';
 import { DbSchema, DbField, SelectModelQuery, InsertModelQuery, UpdateModelQuery, DeleteModelQuery, queries } from './schema';
 import { ModelError } from './errors';
 
@@ -31,7 +31,7 @@ export function isModelClass(modelClass: any): modelClass is typeof Model {
 
 // CLASS DEFINITION
 // ================================================================================================
-export class Model {
+export class Model implements IModel {
 
     private static schema   : DbSchema;
 
