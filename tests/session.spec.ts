@@ -199,14 +199,13 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(result3!.username).to.equal('George');
             });
 
-            it('Two parameterized queries in a row (N-P-P-N) should produce correct result', async () => {
+            it('Mix of parameterized and non-parameterized queries (N-P-P-N) should produce correct result', async () => {
                 const query1 = Query.from('SELECT * FROM tmp_users WHERE id = 1;','query1', 'single');
 
-                const Template2 = Query.template<User>('SELECT * FROM tmp_users WHERE username = {{username}};', {mask: 'single'});
-                const query2 = new Template2({username: 'T\'est'});
+                const Template = Query.template<User>('SELECT * FROM tmp_users WHERE username = {{username}};', {mask: 'single'});
+                const query2 = new Template({username: 'T\'est'});
 
-                const Template3 = Query.template<User>('SELECT * FROM tmp_users WHERE id = {{id}};', {mask: 'single'});
-                const query3 = new Template3({id: 2});
+                const query3 = new Template({username: 'T\'est2'});
 
                 const query4 = Query.from('SELECT * FROM tmp_users WHERE id = 3;','query4', 'single');
 
@@ -214,12 +213,11 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
                 expect(result1!.id).to.equal(1);
                 expect(result2!.username).to.equal('T\'est');
-                expect(result3!.id).to.equal(2);
+                expect(result3).to.be.undefined;
                 expect(result4!.id).to.equal(3);
             });
 
             it('Mix of parameterized and non-parameterized queries (N-N-P-N) should produce correct result', async () => {
-
                 const query1 = Query.from('SELECT * FROM tmp_users WHERE id = 1;','query1', 'single');
                 const query2 = Query.from('SELECT * FROM tmp_users WHERE id = 2;','query2', 'single');
 
@@ -236,7 +234,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(result4!.id).to.equal(3);
             });
 
-            it('Mix of parameterized and non-parameterized queries (P-N-N-N) should produce correct result', async () => { //todo rename
+            it('Mix of parameterized and non-parameterized queries (P-N-N-N) should produce correct result', async () => {
                 const Template = Query.template<User>('SELECT * FROM tmp_users WHERE username = {{username}};', {mask: 'single'});
                 const query1 = new Template({username: 'T\'est'});
 
@@ -268,31 +266,21 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(result4!.username).to.equal('T\'est');
             });
 
-            it('Mix of parameterized and non-parameterized queries (N-N) should produce correct result', async () => { //todo change to match description
-                const query1 = Query.from('SELECT * FROM tmp_users WHERE id IN (1,2);', {mask: 'list'});
-                const query2 = Query.from('SELECT * FROM tmp_users WHERE id IN (3);', {mask: 'list'});
+            it('Mix of parameterized and non-parameterized queries (P-N-N-P) should produce correct result', async () => {
+                const Template = Query.template<User>('SELECT * FROM tmp_users WHERE username = {{username}};', {mask: 'single'});
+                const query1 = new Template({username: 'T\'est'});
 
-                const [result1, result2] = await Promise.all([session.execute(query1), session.execute(query2)]);
+                const query2 = Query.from('SELECT * FROM tmp_users WHERE id = 1;','query1', 'single');
+                const query3 = Query.from('SELECT * FROM tmp_users WHERE id = 2;','query2', 'single');
 
-                expect(result1).to.have.length(2);
-                expect(result2).to.have.length(1);
-            });
+                const query4 = new Template({username: 'T\'est'});
 
-            it('Mix of parameterized and non-parameterized queries (N-N-N) should produce correct result', async () => { //todo change to match description
-                const query1 = Query.from('SELECT * FROM tmp_users WHERE id = 1;', {mask: 'single'});
-                const query2 = Query.from('SELECT * FROM tmp_users WHERE id = 3;', {mask: 'single'});
-                const query3 = Query.from('SELECT * FROM tmp_users WHERE id = 3;', 'test', 'single');
+                const [result1, result2, result3, result4] = await Promise.all([session.execute(query1), session.execute(query2), session.execute(query3), session.execute(query4)]);
 
-                const [result1, result2, result3] = await Promise.all([session.execute(query1), session.execute(query2), session.execute(query3)]);
-
-                expect(result1!.id).to.equal(1);
-                expect(result1!.username).to.equal('Irakliy');
-
-                expect(result2!.id).to.equal(3);
-                expect(result2!.username).to.equal('George');
-
-                expect(result3!.id).to.equal(3);
-                expect(result3!.username).to.equal('George');
+                expect(result1!.username).to.equal('T\'est');
+                expect(result2!.id).to.equal(1);
+                expect(result3!.id).to.equal(2);
+                expect(result4!.username).to.equal('T\'est');
             });
         });
     });

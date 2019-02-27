@@ -94,7 +94,7 @@ class DaoSession {
             throw new errors_1.ConnectionError('Cannot create model: session is read-only');
         }
         // create new model
-        const id = await type.getSchema().idGenerator.getNextId(this.logger, this); // TODO: get rid of any
+        const id = await type.getSchema().idGenerator.getNextId(this.logger, this);
         const createdOn = Date.now();
         const updatedOn = createdOn;
         const model = new type(Object.assign({ id }, seed, { createdOn, updatedOn }), true);

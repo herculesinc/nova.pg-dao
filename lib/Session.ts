@@ -136,7 +136,7 @@ export class DaoSession implements Dao {
         }
 
         // create new model
-        const id = await type.getSchema().idGenerator.getNextId(this.logger, this as any); // TODO: get rid of any
+        const id = await type.getSchema().idGenerator.getNextId(this.logger, this);
         const createdOn = Date.now();
         const updatedOn = createdOn;
         const model = new type({ id, ...seed, createdOn, updatedOn }, true) as InstanceType<T>;
