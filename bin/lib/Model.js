@@ -79,12 +79,6 @@ class Model {
         this[exports.symCreated] = false;
         this[exports.symDeleted] = false;
     }
-    // STATIC METHODS
-    // --------------------------------------------------------------------------------------------
-    // TODO: remove
-    static parse(rowData, fields) {
-        return new this(rowData, fields);
-    }
     static SelectQuery(mask) {
         if (mask === 'single') {
             return this.qSelectOneModel;
@@ -109,6 +103,7 @@ class Model {
         this.qInsertModel = schema_1.queries.buildInsertQueryClass(schema);
         this.qUpdateModel = schema_1.queries.buildUpdateQueryClass(schema);
         this.qDeleteModel = schema_1.queries.buildDeleteQueryClass(schema);
+        return schema;
     }
     static getSchema() {
         return this.schema;

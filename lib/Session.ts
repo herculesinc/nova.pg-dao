@@ -88,6 +88,8 @@ export class DaoSession implements Dao {
             throw new TypeError('Cannot fetch model: forUpdate flag is invalid');
         }
 
+        // TODO: check for read-only
+
         const qSelectModel = type.SelectQuery('single');
         const query = new qSelectModel(forUpdate || false, selector);
         return this.execute(query);
@@ -103,6 +105,8 @@ export class DaoSession implements Dao {
         else if (forUpdate !== undefined && typeof forUpdate !== 'boolean') {
             throw new TypeError('Cannot fetch models: forUpdate flag is invalid');
         }
+
+        // TODO: check for read-only
 
         const qSelectModels = type.SelectQuery('list');
         const query = new qSelectModels(forUpdate || false, selector);
@@ -126,6 +130,8 @@ export class DaoSession implements Dao {
             throw new ConnectionError('Cannot create model: session has already been closed');
         }
 
+        // TODO: check for read-only
+
         // create new model
         const id = await type.getSchema().idGenerator.getNextId(this.logger, this as any); // TODO: get rid of any
         const createdOn = Date.now();
@@ -138,6 +144,9 @@ export class DaoSession implements Dao {
     }
 
     delete<T extends Model>(model: T): T {
+
+        // TODO: check for read-only
+
         this.store.delete(model);
         return model;
     }

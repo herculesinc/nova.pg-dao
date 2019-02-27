@@ -53,7 +53,7 @@ export class Model {
 
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(seed: string[] | object, fieldsOrClone: FieldDescriptor[] | boolean) {
+    constructor(seed: string[] | object, fieldsOrClone?: FieldDescriptor[] | boolean) {
         if (!seed) throw new TypeError('Model seed is undefined');
 
         if (Array.isArray(seed)) {
@@ -98,11 +98,6 @@ export class Model {
 
     // STATIC METHODS
     // --------------------------------------------------------------------------------------------
-    // TODO: remove
-    static parse<T extends typeof Model>(this: T, rowData: string[], fields: FieldDescriptor[]): InstanceType<T> {
-        return (new this(rowData, fields) as InstanceType<T>);
-    }
-
     static SelectQuery<T extends typeof Model>(this: T, mask: 'list'): SelectAllModelsQuery<InstanceType<T>>
     static SelectQuery<T extends typeof Model>(this: T, mask: 'single'): SelectOneModelQuery<InstanceType<T>>
     static SelectQuery<T extends typeof Model>(this: T, mask: QueryMask): any {
@@ -117,7 +112,7 @@ export class Model {
         }
     }
 
-    static setSchema(tableName: string, idGenerator: IdGenerator, fields: FieldMap) {
+    static setSchema(tableName: string, idGenerator: IdGenerator, fields: FieldMap): DbSchema {
         // create and set schema
         const modelName = this.name;
         if (this.schema) throw new ModelError(`Cannot set model schema: schema for ${modelName} model has already been set`);
@@ -130,6 +125,8 @@ export class Model {
         this.qInsertModel = queries.buildInsertQueryClass(schema);
         this.qUpdateModel = queries.buildUpdateQueryClass(schema);
         this.qDeleteModel = queries.buildDeleteQueryClass(schema);
+
+        return schema;
     }
 
     static getSchema(): DbSchema {

@@ -4,7 +4,7 @@ const Query_1 = require("../Query");
 const errors_1 = require("../errors");
 // SELECT QUERY
 // ================================================================================================
-function buildSelectQueryClass(schema, mask, handler) {
+function buildSelectQueryClass(schema, mask, modelType) {
     const queryName = `qSelect${schema.name}Model${(mask === 'list' ? 's' : '')}`;
     const selectText = buildSelectText(schema);
     const fromText = schema.table;
@@ -12,7 +12,7 @@ function buildSelectQueryClass(schema, mask, handler) {
         constructor(mutable, selector) {
             this.name = this.constructor.name || queryName;
             this.mask = mask;
-            this.handler = handler;
+            this.handler = modelType;
             this.mutable = mutable || false;
             this.select = selectText;
             this.from = fromText;

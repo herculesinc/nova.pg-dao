@@ -256,10 +256,10 @@ declare module "@nova/pg-dao" {
         infuse(rowData: string[], fields: FieldDescriptor[]): void;
         getSyncQueries(): Query[];
 
-        isMutable(): boolean;
-        isCreated(): boolean;
-        isDeleted(): boolean;
-        isModified(): boolean;
+        isMutable: boolean;
+        isCreated: boolean;
+        isDeleted: boolean;
+        isModified: boolean;
 
         static SelectQuery<T extends typeof Model>(this: T, mask: 'list'): SelectAllModelsQuery<InstanceType<T>>;
         static SelectQuery<T extends typeof Model>(this: T, mask: 'single'): SelectOneModelQuery<InstanceType<T>>;

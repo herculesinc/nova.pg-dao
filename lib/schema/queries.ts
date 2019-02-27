@@ -1,8 +1,7 @@
 // IMPORTS
 // ================================================================================================
-import { QueryMask, ResultQuery, ResultHandler } from '@nova/pg-dao';
+import { Model, QueryMask, ResultQuery } from '@nova/pg-dao';
 import { Query, stringifySingleParam, stringifyArrayParam } from '../Query';
-import { Model } from '../Model';
 import { ModelError, QueryError } from '../errors';
 import { DbSchema } from './DbSchema';
 import { DbField } from './DbField';
@@ -27,7 +26,7 @@ export interface DeleteModelQuery {
 
 // SELECT QUERY
 // ================================================================================================
-export function buildSelectQueryClass(schema: DbSchema, mask: QueryMask, handler: ResultHandler): SelectModelQuery {
+export function buildSelectQueryClass(schema: DbSchema, mask: QueryMask, modelType: typeof Model): SelectModelQuery {
 
     const queryName = `qSelect${schema.name}Model${(mask === 'list' ? 's' : '')}`;
     const selectText = buildSelectText(schema);
@@ -37,7 +36,7 @@ export function buildSelectQueryClass(schema: DbSchema, mask: QueryMask, handler
 
         readonly name       : string;
         readonly mask       : QueryMask;
-        readonly handler    : ResultHandler;
+        readonly handler    : typeof Model;
         readonly mutable    : boolean;
 
         readonly select     : string;
@@ -48,7 +47,7 @@ export function buildSelectQueryClass(schema: DbSchema, mask: QueryMask, handler
         constructor(mutable: boolean, selector?: object) {
             this.name		= this.constructor.name || queryName;
             this.mask       = mask;
-            this.handler    = handler;
+            this.handler    = modelType;
             this.mutable    = mutable || false;
             this.select     = selectText;
             this.from       = fromText;
