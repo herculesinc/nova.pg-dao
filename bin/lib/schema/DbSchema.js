@@ -11,29 +11,30 @@ class DbSchema {
     constructor(name, table, idGenerator, fields) {
         // validate and set model name
         if (name === undefined)
-            throw new errors_1.ModelError('Cannot build model schema: model name is undefined');
+            throw new TypeError('Cannot build model schema: model name is undefined');
         if (typeof name !== 'string')
-            throw new errors_1.ModelError('Cannot build model schema: model name must be a string');
+            throw new TypeError('Cannot build model schema: model name must be a string');
         this.name = name.trim();
         if (this.name === '')
-            throw new errors_1.ModelError('Cannot build model schema: model name cannot be an empty string');
+            throw new TypeError('Cannot build model schema: model name cannot be an empty string');
         // validate and set table name
         if (table === undefined)
-            throw new errors_1.ModelError('Cannot build model schema: table name is undefined');
+            throw new TypeError('Cannot build model schema: table name is undefined');
         if (typeof table !== 'string')
-            throw new errors_1.ModelError('Cannot build model schema: table name must be a string');
+            throw new TypeError('Cannot build model schema: table name must be a string');
         this.table = table.trim();
         if (this.table === '')
-            throw new errors_1.ModelError('Cannot build model schema: table name cannot be an empty string');
+            throw new TypeError('Cannot build model schema: table name cannot be an empty string');
         // validate and set ID Generator
-        if (!idGenerator)
-            throw new errors_1.ModelError('Cannot build model schema: ID Generator is undefined');
-        if (typeof idGenerator.getNextId !== 'function')
-            throw new errors_1.ModelError('Cannot build model schema: ID Generator is invalid');
+        if (idGenerator === undefined)
+            throw new TypeError('Cannot build model schema: ID Generator is undefined');
+        if (typeof idGenerator !== 'object' || idGenerator === null || typeof idGenerator.getNextId !== 'function') {
+            throw new TypeError('Cannot build model schema: ID Generator is invalid');
+        }
         this.idGenerator = idGenerator;
         // validate and set fields
         if (!fields)
-            throw new errors_1.ModelError('Cannot build model schema: fields are undefined');
+            throw new TypeError('Cannot build model schema: fields are undefined');
         this.fields = [];
         this.fieldMap = new Map();
         this.customSerializers = new Map();
@@ -49,10 +50,11 @@ class DbSchema {
         this.fields.push(updatedOnField);
         this.fieldMap.set(updatedOnField.name, updatedOnField);
         // set all other model fields
+        let fieldCount = 0;
         for (let fieldName in fields) {
             let config = fields[fieldName];
             if (!config)
-                throw new errors_1.ModelError(`Cannot build model schema: definition for field '${fieldName}' is undefined`);
+                throw new TypeError(`Cannot build model schema: definition for field '${fieldName}' is undefined`);
             let field = (config instanceof DbField_1.DbField)
                 ? config
                 : new DbField_1.DbField(fieldName, config.type, config.readonly, config.handler);
@@ -61,6 +63,11 @@ class DbSchema {
             if (field.serialize) {
                 this.customSerializers.set(field.name, field);
             }
+            fieldCount++;
+        }
+        if (fieldCount === 0) {
+            if (!fields)
+                throw new errors_1.ModelError(`Cannot define a model for ${table} table: schema has no fields`);
         }
     }
     // PUBLIC ACCESSORS

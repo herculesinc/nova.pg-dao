@@ -59,6 +59,9 @@ export function buildSelectQueryClass(schema: DbSchema, mask: QueryMask, modelTy
         }
 
         get text(): string {
+            if (this.where === undefined) {
+                throw new ModelError(`Invalid SELECT query for ${this.name} model: WHERE condition is undefined`);
+            }
             return `SELECT ${this.select} FROM ${this.from} WHERE ${this.where}${ this.mutable ? ' FOR UPDATE' : ''};`;
         }
 

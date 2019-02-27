@@ -9,7 +9,7 @@ const idGenerator = new PgIdGenerator(`${table}_seq`);
 
 let schema: any;
 
-describe.only('NOVA.PG-DAO -> Model;', () => {
+describe('NOVA.PG-DAO -> Model;', () => {
     it('should create new model without errors', () => {
         expect(() => {
             class TestModel extends Model {
@@ -169,7 +169,7 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
 
     });
 
-    describe.only('Generation of Select/Insert/Update/Delete SQL statements', () => {
+    describe('Generation of Select/Insert/Update/Delete SQL statements', () => {
         let TModel: any;
 
         const selectTests = [
@@ -307,7 +307,7 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
                             @dbField(Number)
                             num!: number;
                         }
-                    }).to.throw(ModelError, error);
+                    }).to.throw(TypeError, error);
                 });
             });
         });
@@ -331,7 +331,7 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
                             @dbField(Number)
                             num!: number;
                         }
-                    }).to.throw(ModelError, error);
+                    }).to.throw(TypeError, error);
                 });
             });
         });
@@ -342,7 +342,7 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
                     @dbModel(table, idGenerator)
                     class TestModel extends Model {
                     }
-                }).to.throw(ModelError, 'error');
+                }).to.throw(ModelError, `Cannot define model for ${table} table: schema has no fields`);
             });
         });
 
@@ -368,7 +368,7 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
                         }
 
                         dbField(Number)(TestModel, fieldName);
-                    }).to.throw(ModelError, error);
+                    }).to.throw(TypeError, error);
                 });
             });
         });
@@ -396,7 +396,7 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
                         }
 
                         dbField(fieldType)(TestModel, 'test');
-                    }).to.throw(ModelError, error);
+                    }).to.throw(TypeError, error);
                 });
             });
         });
@@ -420,7 +420,7 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
                         }
 
                         dbField(Number, {readonly})(TestModel, 'test');
-                    }).to.throw(ModelError, error);
+                    }).to.throw(TypeError, error);
                 });
             });
         });

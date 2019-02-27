@@ -11,19 +11,19 @@ class DbField {
     constructor(name, type, readonly, handler) {
         // validate and set name
         if (typeof name !== 'string')
-            throw new errors_1.ModelError('Database field name must be a string');
+            throw new TypeError('Database field name must be a string');
         this.name = name.trim();
         if (name === '')
-            throw new errors_1.ModelError('Database field name cannot be an empty string');
+            throw new TypeError('Database field name cannot be an empty string');
         this.snakeName = util.camelToSnake(this.name);
         // set the type
         if (type === undefined)
-            throw new errors_1.ModelError('Database field type is undefined');
+            throw new TypeError('Database field type is undefined');
         this.type = type;
         // validate and set readonly
         if (readonly !== undefined) {
             if (typeof readonly !== 'boolean')
-                throw new errors_1.ModelError('Database field readonly attribute must be a boolean');
+                throw new TypeError('Database field readonly attribute must be a boolean');
             this.readonly = readonly;
         }
         else {
@@ -63,7 +63,7 @@ class DbField {
                 break;
             }
             default: {
-                throw new errors_1.ModelError(`Invalid field type in model schema`);
+                throw new TypeError(`Invalid field type in model schema`);
             }
         }
     }
@@ -76,23 +76,23 @@ function validateFieldHandler(handler) {
         return {};
     const cloner = handler.clone;
     if (!cloner)
-        throw new errors_1.ModelError('Undefined cloner in field handler');
+        throw new TypeError('Undefined cloner in field handler');
     if (typeof cloner !== 'function')
-        throw new errors_1.ModelError('Invalid cloner in field handler');
+        throw new TypeError('Invalid cloner in field handler');
     const comparator = handler.areEqual;
     if (!comparator)
-        throw new errors_1.ModelError('Undefined comparator in field handler');
+        throw new TypeError('Undefined comparator in field handler');
     if (typeof comparator !== 'function')
-        throw new errors_1.ModelError('Invalid comparator in field handler');
+        throw new TypeError('Invalid comparator in field handler');
     const parser = handler.parse;
     if (parser !== undefined) {
         if (typeof parser !== 'function')
-            throw new errors_1.ModelError('Invalid parser in field handler');
+            throw new TypeError('Invalid parser in field handler');
     }
     const serializer = handler.serialize;
     if (serializer !== undefined) {
         if (typeof serializer !== 'function')
-            throw new errors_1.ModelError('Invalid serializer in field handler');
+            throw new TypeError('Invalid serializer in field handler');
     }
     return { cloner, comparator, parser, serializer };
 }

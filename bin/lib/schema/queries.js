@@ -22,6 +22,9 @@ function buildSelectQueryClass(schema, mask, modelType) {
             }
         }
         get text() {
+            if (this.where === undefined) {
+                throw new errors_1.ModelError(`Invalid SELECT query for ${this.name} model: WHERE condition is undefined`);
+            }
             return `SELECT ${this.select} FROM ${this.from} WHERE ${this.where}${this.mutable ? ' FOR UPDATE' : ''};`;
         }
         get values() {

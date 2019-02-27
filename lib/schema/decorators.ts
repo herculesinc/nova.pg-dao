@@ -19,17 +19,22 @@ export interface dbFieldOptions {
 // ================================================================================================
 export function dbModel(table: string, idGenerator: IdGenerator): ClassDecorator {
 	// validate table name
-	if (!table) throw new ModelError('Cannot build model schema: table name is undefined');
-	if (table.trim() === '') throw new ModelError('Cannot build model schema: table name is invalid');
+	if (table === undefined) throw new TypeError('Cannot build model schema: table name is undefined');
+        if (typeof table !== 'string') throw new TypeError('Cannot build model schema: table name is invalid');
+        table = table.trim();
+		if (table === '') throw new TypeError('Cannot build model schema: table name is invalid');
 
 	// validate ID Generator
-	if (!idGenerator) throw new ModelError('Cannot build model schema: ID Generator is undefined');
-	if (typeof idGenerator.getNextId !== 'function')
-		throw new ModelError('Cannot build model schema: ID Generator is invalid');
+    if (idGenerator === undefined) throw new TypeError('Cannot build model schema: ID Generator is undefined');
+    if (typeof idGenerator !== 'object' || idGenerator === null || typeof idGenerator.getNextId !== 'function') {
+        throw new TypeError('Cannot build model schema: ID Generator is invalid');
+    }
 
     return function (classConstructor: any) {
         const schemaMap: Map<string, any> = classConstructor.prototype[symFields];
+        if (!schemaMap) throw new ModelError(`Cannot define model for ${table} table: schema has no fields`);
         const fields = schemaMap.get(classConstructor.name);
+        if (!fields) throw new ModelError(`Cannot define model for ${table} table: schema has no fields`);
         classConstructor.setSchema(table, idGenerator, fields);
     };
 }
@@ -39,7 +44,7 @@ export function dbField(fieldType: DbFieldType, options?: dbFieldOptions): Prope
     options = { readonly: false , ...options };
 
     return function (classPrototype: any, property: string | symbol) {
-        if (typeof property === 'symbol') throw new ModelError('A symbol property cannot be a part of model schema');
+        if (typeof property === 'symbol') throw new TypeError('A symbol property cannot be a part of model schema');
         const field = new DbField(property, fieldType, options!.readonly, options!.handler);
 
         let schemaMap: Map<string, any> = classPrototype[symFields];
