@@ -11,7 +11,7 @@ class PgIdGenerator {
             handler: idExtractor
         };
     }
-    async getNextId(dao) {
+    async getNextId(logger, dao) {
         return dao.execute(this.idSequenceQuery);
     }
 }

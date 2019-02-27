@@ -46,7 +46,7 @@ class Model {
         }
         else {
             // the model is being built from an object
-            if (typeof seed !== 'object')
+            if (typeof seed !== 'object' || seed === null)
                 throw new TypeError('Model seed is invalid');
             const clone = (fieldsOrClone === undefined) ? false : fieldsOrClone;
             if (typeof clone !== 'boolean')
@@ -167,9 +167,12 @@ class Model {
             queries.push(this.buildDeleteQuery());
         }
         else {
+            // check if the model has original values
+            const original = this[symOriginal];
+            if (!original)
+                return queries;
             // check if any fields have changed
             const schema = this.constructor.getSchema();
-            const original = this[symOriginal];
             const changes = [];
             for (let field of schema.fields) {
                 if (field.readonly)

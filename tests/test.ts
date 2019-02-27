@@ -86,24 +86,27 @@ const Password: FieldHandler = {
     areEqual(pwd1: Password, pwd2: Password) { return pwd1 === pwd2; }
 };
 
-@dbModel('accounts', new PgIdGenerator('accounts_seq'))
-class Account extends Model {
+@dbModel('tokens', new PgIdGenerator('tokens_seq'))
+class Token extends Model {
 
-    @dbField(String)
-    username!: string;
+    @dbField(String, { readonly: true })
+    accountId!: string;
 
-    @dbField(Object, { handler: Password })
-    password!: Password;
+    @dbField(Number)
+    status!: number;
+
+    @dbField(Object)
+    origin!: any;
 }
 
 (function modelTests() {
 
-    console.log(JSON.stringify(Account.getSchema()));
-    const qSelectAccounts = Account.SelectQuery('list');
+    console.log(JSON.stringify(Token.getSchema()));
+    const qSelectAccounts = Token.SelectQuery('list');
     console.log(new qSelectAccounts(false, { id: '123' }).text);
     console.log(new qSelectAccounts(true,  { id: '234' }).text);
 
-})();
+});
 
 // DATABASE TESTS
 // ================================================================================================
@@ -135,10 +138,13 @@ const database = new Database({
     try {
         const results = await Promise.all([result1, result2, result3 ]);
         console.log(JSON.stringify(results));
+
+        const token = await session.fetchOne(Token, { id: '1554790800074735617'});
+        console.log(JSON.stringify(token));
         
         await session.close('commit');
     }
     catch (error) {
         console.error(error);
     }
-});
+})();

@@ -17,8 +17,9 @@ let db: Database;
 let session: DaoSession;
 
 const options: SessionOptions = {
-    readonly: false,
-    logQueryText: false
+    checkImmutable  : true,
+    readonly        : false,
+    logQueryText    : false
 };
 
 const logger = new MockLogger();

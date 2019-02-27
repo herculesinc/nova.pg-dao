@@ -38,6 +38,7 @@ declare module "@nova/pg-dao" {
 
     export interface SessionOptions {
         readonly        : boolean;
+        checkImmutable  : boolean;
         logQueryText    : boolean;
     }
 
@@ -65,7 +66,18 @@ declare module "@nova/pg-dao" {
         execute<T>(query: ListResultQuery<T>)   : Promise<T[]>;
         execute(query: Query<void>)             : Promise<void>;
 
-        close(action: 'commit' | 'rollback'): Promise<any>;
+        getOne<T extends typeof Model>(type: T, id: string): InstanceType<T> | undefined;
+        getAll<T extends typeof Model>(type: T): InstanceType<T>[];
+
+        fetchOne<T extends typeof Model>(type: T, selector: object, forUpdate?: boolean): Promise<InstanceType<T> | undefined>;
+        fetchAll<T extends typeof Model>(type: T, selector: object, forUpdate?: boolean): Promise<InstanceType<T>[]>;
+
+        load<T extends typeof Model>(type: T, seed: object): InstanceType<T>;
+        create<T extends typeof Model>(type: T, seed: object): Promise<InstanceType<T>>;
+        delete<T extends Model>(model: T): T;
+
+        flush(): Promise<void>;
+        close(action: 'commit' | 'rollback'): Promise<void>;
     }
 
     // RESULT HANDLER
@@ -203,7 +215,7 @@ declare module "@nova/pg-dao" {
     }
 
     export interface IdGenerator {
-        getNextId(dao?: DaoSession): Promise<string>;
+        getNextId(logger?: Logger, dao?: DaoSession): Promise<string>;
     }
 
     // MODELS

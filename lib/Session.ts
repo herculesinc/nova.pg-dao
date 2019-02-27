@@ -5,6 +5,7 @@ import { Query, SingleResultQuery, ListResultQuery, SessionOptions, Logger, Trac
 import { Client } from 'pg';
 import { Command } from './Command';
 import { Store } from './Store';
+import { Model, isModelClass } from './Model';
 import { ConnectionError } from './errors';
 
 // INTERFACES AND ENUMS
@@ -32,6 +33,7 @@ export class DaoSession implements Dao {
     private readonly logger         : Logger;
     private readonly readonly       : boolean;
     private readonly logQueryText   : boolean;
+    private readonly checkImmutable : boolean;
 
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
@@ -42,8 +44,9 @@ export class DaoSession implements Dao {
 
         this.readonly = options.readonly;
         this.logQueryText = options.logQueryText;
+        this.checkImmutable = options.checkImmutable;
         this.logger = logger;
-        this.store = new Store();
+        this.store = new Store(options);
 
         this.state = DaoState.pending;
         this.client = undefined;
@@ -64,8 +67,109 @@ export class DaoSession implements Dao {
         return (this.state <= DaoState.active);
     }
 
-    // CLOSE METHODS
+    // MODEL METHODS
     // --------------------------------------------------------------------------------------------
+    getOne<T extends typeof Model>(type: T, id: string): InstanceType<T> | undefined {
+        return this.store.get(type, id);
+    }
+
+    getAll<T extends typeof Model>(type: T): InstanceType<T>[] {
+        return this.store.getAll(type);
+    }
+
+    async fetchOne<T extends typeof Model>(type: T, selector: object, forUpdate?: boolean): Promise<InstanceType<T> | undefined> {
+        if (!isModelClass(type)) {
+            throw new TypeError('Cannot fetch model: model type is invalid');
+        }
+        else if (typeof selector !== 'object' || selector === null) {
+            throw new TypeError('Cannot fetch model: selector is invalid');
+        }
+        else if (forUpdate !== undefined && typeof forUpdate !== 'boolean') {
+            throw new TypeError('Cannot fetch model: forUpdate flag is invalid');
+        }
+
+        const qSelectModel = type.SelectQuery('single');
+        const query = new qSelectModel(forUpdate || false, selector);
+        return this.execute(query);
+    }
+
+    async fetchAll<T extends typeof Model>(type: T, selector: object, forUpdate?: boolean): Promise<InstanceType<T>[]> {
+        if (!isModelClass(type)) {
+            throw new TypeError('Cannot fetch models: model type is invalid');
+        }
+        else if (typeof selector !== 'object' || selector === null) {
+            throw new TypeError('Cannot fetch models: selector is invalid');
+        }
+        else if (forUpdate !== undefined && typeof forUpdate !== 'boolean') {
+            throw new TypeError('Cannot fetch models: forUpdate flag is invalid');
+        }
+
+        const qSelectModels = type.SelectQuery('list');
+        const query = new qSelectModels(forUpdate || false, selector);
+        return this.execute(query);
+    }
+
+    load<T extends typeof Model>(type: T, seed: object): InstanceType<T> {
+        if (!isModelClass(type)) throw new TypeError('Cannot load model: model type is invalid');
+        if (!this.isActive) {
+            throw new ConnectionError('Cannot load model: session has already been closed');
+        }
+
+        const model = new type(seed, false) as InstanceType<T>;
+        this.store.insert(model, false);
+        return model;
+    }
+
+    async create<T extends typeof Model>(type: T, seed: object): Promise<InstanceType<T>> {
+        if (!isModelClass(type)) throw new TypeError('Cannot create model: model type is invalid');
+        if (!this.isActive) {
+            throw new ConnectionError('Cannot create model: session has already been closed');
+        }
+
+        // create new model
+        const id = await type.getSchema().idGenerator.getNextId(this.logger, this as any); // TODO: get rid of any
+        const createdOn = Date.now();
+        const updatedOn = createdOn;
+        const model = new type({ id, ...seed, createdOn, updatedOn }, true) as InstanceType<T>;
+
+        // add the model to the store and return
+        this.store.insert(model, true);
+        return model;
+    }
+
+    delete<T extends Model>(model: T): T {
+        this.store.delete(model);
+        return model;
+    }
+
+    // SYNC METHODS
+    // --------------------------------------------------------------------------------------------
+    async flush(): Promise<void> {
+        if (!this.isActive) {
+            throw new ConnectionError('Cannot flush session: session has already been closed');
+        }
+        
+        // don't attempt to sync read-only sessions when checkImmutable is not set
+        if (this.isReadOnly && !this.checkImmutable) return;
+
+        // build a list of sync queries
+        const queries = this.store.getSyncQueries();
+        if (queries.length === 0) return;
+        if (this.isReadOnly) {
+            throw new ConnectionError('Cannot flush session: dirty models detected in a read-only session');
+        }
+
+        // execute sync queries
+        const promises: Promise<any>[] = [];
+        for (let query of queries) {
+            promises.push(this.execute(query));
+        }
+        await Promise.all(promises);
+
+        // clean changes from all models
+        this.store.applyChanges();
+    }
+
     async close(action: 'commit' | 'rollback'): Promise<any> {
         if (!this.isActive) {
             throw new ConnectionError('Cannot close session: session has already been closed');
@@ -83,6 +187,7 @@ export class DaoSession implements Dao {
         try {
             let closePromise: Promise<any>;
             if (action === 'commit') {
+                // TODO: flush changes
                 this.logger.debug('Committing and closing session');
                 closePromise = this.execute(COMMIT_TRANSACTION);
             }

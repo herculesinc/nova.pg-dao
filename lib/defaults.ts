@@ -25,6 +25,7 @@ export const defaults: Defaults = {
     },
     session: {
         readonly        : true,
+        checkImmutable  : true,
         logQueryText    : false
     },
     pool: {

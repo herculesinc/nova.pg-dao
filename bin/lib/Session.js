@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const Command_1 = require("./Command");
 const Store_1 = require("./Store");
+const Model_1 = require("./Model");
 const errors_1 = require("./errors");
 // CLASS DEFINITION
 // ================================================================================================
@@ -13,8 +14,9 @@ class DaoSession {
         this.source = source;
         this.readonly = options.readonly;
         this.logQueryText = options.logQueryText;
+        this.checkImmutable = options.checkImmutable;
         this.logger = logger;
-        this.store = new Store_1.Store();
+        this.store = new Store_1.Store(options);
         this.state = 1 /* pending */;
         this.client = undefined;
         this.commands = [];
@@ -30,8 +32,96 @@ class DaoSession {
     get isActive() {
         return (this.state <= 3 /* active */);
     }
-    // CLOSE METHODS
+    // MODEL METHODS
     // --------------------------------------------------------------------------------------------
+    getOne(type, id) {
+        return this.store.get(type, id);
+    }
+    getAll(type) {
+        return this.store.getAll(type);
+    }
+    async fetchOne(type, selector, forUpdate) {
+        if (!Model_1.isModelClass(type)) {
+            throw new TypeError('Cannot fetch model: model type is invalid');
+        }
+        else if (typeof selector !== 'object' || selector === null) {
+            throw new TypeError('Cannot fetch model: selector is invalid');
+        }
+        else if (forUpdate !== undefined && typeof forUpdate !== 'boolean') {
+            throw new TypeError('Cannot fetch model: forUpdate flag is invalid');
+        }
+        const qSelectModel = type.SelectQuery('single');
+        const query = new qSelectModel(forUpdate || false, selector);
+        return this.execute(query);
+    }
+    async fetchAll(type, selector, forUpdate) {
+        if (!Model_1.isModelClass(type)) {
+            throw new TypeError('Cannot fetch models: model type is invalid');
+        }
+        else if (typeof selector !== 'object' || selector === null) {
+            throw new TypeError('Cannot fetch models: selector is invalid');
+        }
+        else if (forUpdate !== undefined && typeof forUpdate !== 'boolean') {
+            throw new TypeError('Cannot fetch models: forUpdate flag is invalid');
+        }
+        const qSelectModels = type.SelectQuery('list');
+        const query = new qSelectModels(forUpdate || false, selector);
+        return this.execute(query);
+    }
+    load(type, seed) {
+        if (!Model_1.isModelClass(type))
+            throw new TypeError('Cannot load model: model type is invalid');
+        if (!this.isActive) {
+            throw new errors_1.ConnectionError('Cannot load model: session has already been closed');
+        }
+        const model = new type(seed, false);
+        this.store.insert(model, false);
+        return model;
+    }
+    async create(type, seed) {
+        if (!Model_1.isModelClass(type))
+            throw new TypeError('Cannot create model: model type is invalid');
+        if (!this.isActive) {
+            throw new errors_1.ConnectionError('Cannot create model: session has already been closed');
+        }
+        // create new model
+        const id = await type.getSchema().idGenerator.getNextId(this.logger, this); // TODO: get rid of any
+        const createdOn = Date.now();
+        const updatedOn = createdOn;
+        const model = new type(Object.assign({ id }, seed, { createdOn, updatedOn }), true);
+        // add the model to the store and return
+        this.store.insert(model, true);
+        return model;
+    }
+    delete(model) {
+        this.store.delete(model);
+        return model;
+    }
+    // SYNC METHODS
+    // --------------------------------------------------------------------------------------------
+    async flush() {
+        if (!this.isActive) {
+            throw new errors_1.ConnectionError('Cannot flush session: session has already been closed');
+        }
+        // don't attempt to sync read-only sessions when checkImmutable is not set
+        if (this.isReadOnly && !this.checkImmutable)
+            return;
+        // build a list of sync queries
+        const queries = this.store.getSyncQueries();
+        if (queries.length === 0)
+            return;
+        if (this.isReadOnly) {
+            throw new errors_1.ConnectionError('Cannot flush session: dirty models detected in a read-only session');
+        }
+        // execute sync queries
+        const promises = [];
+        for (let query of queries) {
+            promises.push(this.execute(query));
+        }
+        await Promise.all(promises);
+        // clean changes from all models
+        this.store.applyChanges();
+    }
     async close(action) {
         if (!this.isActive) {
             throw new errors_1.ConnectionError('Cannot close session: session has already been closed');
@@ -47,6 +137,7 @@ class DaoSession {
         try {
             let closePromise;
             if (action === 'commit') {
+                // TODO: flush changes
                 this.logger.debug('Committing and closing session');
                 closePromise = this.execute(COMMIT_TRANSACTION);
             }

@@ -1,6 +1,6 @@
 // IMPORTS
 // ================================================================================================
-import { IdGenerator, SingleResultQuery, DaoSession } from '@nova/pg-dao';
+import { IdGenerator, SingleResultQuery, DaoSession, Logger } from '@nova/pg-dao';
 
 // POSTGRES ID GENERATOR
 // ================================================================================================
@@ -17,7 +17,7 @@ export class PgIdGenerator implements IdGenerator {
         };
     }
     
-    async getNextId(dao: DaoSession): Promise<string> {
+    async getNextId(logger: Logger, dao: DaoSession): Promise<string> {
         return dao.execute(this.idSequenceQuery) as Promise<string>;
     }
 }

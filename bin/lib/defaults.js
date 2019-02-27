@@ -14,6 +14,7 @@ exports.defaults = {
     },
     session: {
         readonly: true,
+        checkImmutable: true,
         logQueryText: false
     },
     pool: {

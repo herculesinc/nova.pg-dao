@@ -7,21 +7,37 @@ const errors_1 = require("./errors");
 class Store {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor() {
+    constructor(config) {
         this.cache = new Map();
-        this.validateImmutability = true;
+        this.checkImmutable = config.checkImmutable;
     }
     // ACCESSORS
     // --------------------------------------------------------------------------------------------
-    get(modelClass, id) {
-        if (!Model_1.isModelClass(modelClass))
-            throw new TypeError('Cannot get model: model class is invalid');
-        const models = this.cache.get(modelClass);
-        if (models) {
-            const model = models.get(id);
+    get(type, id) {
+        if (!Model_1.isModelClass(type))
+            throw new TypeError('Cannot get model: model type is invalid');
+        if (typeof id !== 'string')
+            throw new TypeError('Cannot get model: model id is invalid');
+        const storedModels = this.cache.get(type);
+        if (storedModels) {
+            const model = storedModels.get(id);
             if (model && !model.isDeleted)
                 return model;
         }
+    }
+    getAll(type) {
+        if (!Model_1.isModelClass(type))
+            throw new TypeError('Cannot get model: model type is invalid');
+        const models = [];
+        const storedModels = this.cache.get(type);
+        if (storedModels) {
+            for (let model of storedModels.values()) {
+                if (model.isDeleted)
+                    continue;
+                models.push(model);
+            }
+        }
+        return models;
     }
     // LOADING METHODS
     // --------------------------------------------------------------------------------------------
@@ -52,15 +68,17 @@ class Store {
         }
         return models;
     }
-    insert(model) {
+    insert(model, created) {
         const modelClass = Model_1.getModelClass(model);
         if (model.isDeleted)
             throw new errors_1.ModelError(`Cannot insert ${modelClass.name} model: model has been deleted`);
         const storedModels = this.getModelMap(modelClass, true);
         if (storedModels.has(model.id))
             throw new errors_1.ModelError(`Cannot insert ${modelClass.name} model: model has already been inserted`);
-        model[Model_1.symCreated] = true;
-        model[Model_1.symMutable] = true;
+        if (created) {
+            model[Model_1.symCreated] = true;
+            model[Model_1.symMutable] = true;
+        }
         return model;
     }
     delete(model) {
@@ -88,7 +106,7 @@ class Store {
     // --------------------------------------------------------------------------------------------
     getSyncQueries() {
         let queries = [];
-        if (this.validateImmutability) {
+        if (this.checkImmutable) {
             // iterate through models and check every model for changes
             for (let models of this.cache.values()) {
                 for (let model of models.values()) {
