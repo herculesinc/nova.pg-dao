@@ -8,8 +8,8 @@ export const settings = {
         password: ''
     },
     pool: {
-        maxSize          : 10,
-        idleTimeout      : 1000,
-        connectionTimeout: 3000
+        maxSize         : 10,
+        idleTimeout     : 1000,
+        reapInterval    : 3000
     }
 };

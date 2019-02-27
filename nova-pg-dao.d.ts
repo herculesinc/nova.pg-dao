@@ -11,8 +11,8 @@ declare module "@nova/pg-dao" {
     // --------------------------------------------------------------------------------------------
     export interface DatabaseConfig {
         name?           : string;
-        pool?           : PoolOptions;
-        session?        : SessionOptions;
+        pool?           : Partial<PoolOptions>;
+        session?        : Partial<SessionOptions>;
         connection      : ConnectionSettings;
     }
 
@@ -26,9 +26,9 @@ declare module "@nova/pg-dao" {
     }
     
     export interface PoolOptions {
-        maxSize?        : number;
-        idleTimeout?    : number;
-        reapInterval?   : number;
+        maxSize         : number;
+        idleTimeout     : number;
+        reapInterval    : number;
     }
 
     export interface PoolState {
@@ -107,6 +107,7 @@ declare module "@nova/pg-dao" {
         readonly mask?      : QueryMask;
         readonly values?    : any[];
         readonly handler?   : QueryHandler<T>;
+        readonly mutable?   : boolean;
     }
 
     export const Query: {
@@ -154,6 +155,7 @@ declare module "@nova/pg-dao" {
     }
     
     export interface ListResultQueryOptions<T=any> extends ResultQueryOptions<T> {
+        readonly name?      : string;
         readonly mask       : 'list';
         readonly handler?   : QueryHandler<T>;
     }
@@ -214,8 +216,30 @@ declare module "@nova/pg-dao" {
         getField(fieldNam: string)  : DbField | undefined;
     }
 
+    // ID GENERATORS
+    // --------------------------------------------------------------------------------------------
     export interface IdGenerator {
         getNextId(logger?: Logger, dao?: DaoSession): Promise<string>;
+    }
+
+    export class PgIdGenerator implements IdGenerator {
+        constructor(idSequenceName: string);
+        getNextId(logger?: Logger, dao?: DaoSession): Promise<string>;
+    }
+
+    export class GuidGenerator implements IdGenerator {
+        constructor(options?: any);
+        getNextId(): Promise<string>;
+    }
+
+    // DECORATORS
+    // --------------------------------------------------------------------------------------------
+    export function dbModel(table: string, idGenerator: IdGenerator): ClassDecorator;
+    export function dbField(fieldType: DbFieldType, options?: dbFieldOptions): PropertyDecorator;
+
+    export interface dbFieldOptions {
+        readonly?   : boolean;
+        handler?    : FieldHandler;
     }
 
     // MODELS

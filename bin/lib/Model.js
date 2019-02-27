@@ -81,6 +81,7 @@ class Model {
     }
     // STATIC METHODS
     // --------------------------------------------------------------------------------------------
+    // TODO: remove
     static parse(rowData, fields) {
         return new this(rowData, fields);
     }

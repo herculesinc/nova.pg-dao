@@ -98,6 +98,7 @@ export class Model {
 
     // STATIC METHODS
     // --------------------------------------------------------------------------------------------
+    // TODO: remove
     static parse<T extends typeof Model>(this: T, rowData: string[], fields: FieldDescriptor[]): InstanceType<T> {
         return (new this(rowData, fields) as InstanceType<T>);
     }

@@ -3,10 +3,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 // POSTGRES ID GENERATOR
 // ================================================================================================
 class PgIdGenerator {
-    constructor(idSequence) {
+    constructor(idSequenceName) {
         this.idSequenceQuery = {
-            name: 'qGetNextId:' + idSequence,
-            text: `SELECT nextval('${idSequence}'::regclass) AS id;`,
+            name: 'qGetNextId:' + idSequenceName,
+            text: `SELECT nextval('${idSequenceName}'::regclass) AS id;`,
             mask: 'single',
             handler: idExtractor
         };
@@ -16,14 +16,14 @@ class PgIdGenerator {
     }
 }
 exports.PgIdGenerator = PgIdGenerator;
-// GUID ID GENERATOR
+// GUID GENERATOR
 // ================================================================================================
-class GuidIdGenerator {
+class GuidGenerator {
     async getNextId() {
         return ''; // TODO: generate a new guid
     }
 }
-exports.GuidIdGenerator = GuidIdGenerator;
+exports.GuidGenerator = GuidGenerator;
 // HELPERS
 // ================================================================================================
 const idExtractor = {

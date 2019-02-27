@@ -8,10 +8,10 @@ export class PgIdGenerator implements IdGenerator {
     
     idSequenceQuery: SingleResultQuery<string>;
     
-    constructor(idSequence: string) {
+    constructor(idSequenceName: string) {
         this.idSequenceQuery = {
-            name    : 'qGetNextId:' + idSequence,
-            text    : `SELECT nextval('${idSequence}'::regclass) AS id;`,
+            name    : 'qGetNextId:' + idSequenceName,
+            text    : `SELECT nextval('${idSequenceName}'::regclass) AS id;`,
             mask    : 'single',
             handler : idExtractor
         };
@@ -22,9 +22,9 @@ export class PgIdGenerator implements IdGenerator {
     }
 }
 
-// GUID ID GENERATOR
+// GUID GENERATOR
 // ================================================================================================
-export class GuidIdGenerator implements IdGenerator {
+export class GuidGenerator implements IdGenerator {
     async getNextId(): Promise<string> {
         return ''; // TODO: generate a new guid
     }

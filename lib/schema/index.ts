@@ -2,6 +2,8 @@ export { DbSchema } from './DbSchema';
 export { DbField } from './DbField';
 export { Timestamp } from './types';
 export { SelectModelQuery, InsertModelQuery, UpdateModelQuery, DeleteModelQuery } from './queries';
+export { dbModel, dbField } from './decorators';
+export { PgIdGenerator, GuidGenerator } from './idGenerators';
 
 import { buildSelectQueryClass, buildInsertQueryClass, buildUpdateQueryClass, buildDeleteQueryClass } from './queries';
 export const queries = {
