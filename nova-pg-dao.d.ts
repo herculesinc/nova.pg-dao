@@ -67,7 +67,7 @@ declare module "@nova/pg-dao" {
         execute(query: Query<void>)             : Promise<void>;
 
         getOne<T extends typeof Model>(type: T, id: string): InstanceType<T> | undefined;
-        getAll<T extends typeof Model>(type: T): InstanceType<T>[];
+        getAll<T extends typeof Model>(type: T): ReadonlyMap<string, InstanceType<T>>;
 
         fetchOne<T extends typeof Model>(type: T, selector: object, forUpdate?: boolean): Promise<InstanceType<T> | undefined>;
         fetchAll<T extends typeof Model>(type: T, selector: object, forUpdate?: boolean): Promise<InstanceType<T>[]>;

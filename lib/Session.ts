@@ -73,7 +73,7 @@ export class DaoSession implements Dao {
         return this.store.get(type, id);
     }
 
-    getAll<T extends typeof Model>(type: T): InstanceType<T>[] {
+    getAll<T extends typeof Model>(type: T): ReadonlyMap<string, InstanceType<T>> {
         return this.store.getAll(type);
     }
 
@@ -87,8 +87,9 @@ export class DaoSession implements Dao {
         else if (forUpdate !== undefined && typeof forUpdate !== 'boolean') {
             throw new TypeError('Cannot fetch model: forUpdate flag is invalid');
         }
-
-        // TODO: check for read-only
+        else if (forUpdate && this.isReadOnly) {
+            throw new ConnectionError('Cannot fetch mutable model: session is read-only');
+        }
 
         const qSelectModel = type.SelectQuery('single');
         const query = new qSelectModel(forUpdate || false, selector);
@@ -105,8 +106,9 @@ export class DaoSession implements Dao {
         else if (forUpdate !== undefined && typeof forUpdate !== 'boolean') {
             throw new TypeError('Cannot fetch models: forUpdate flag is invalid');
         }
-
-        // TODO: check for read-only
+        else if (forUpdate && this.isReadOnly) {
+            throw new ConnectionError('Cannot fetch mutable models: session is read-only');
+        }
 
         const qSelectModels = type.SelectQuery('list');
         const query = new qSelectModels(forUpdate || false, selector);
@@ -129,8 +131,9 @@ export class DaoSession implements Dao {
         if (!this.isActive) {
             throw new ConnectionError('Cannot create model: session has already been closed');
         }
-
-        // TODO: check for read-only
+        else if (this.isReadOnly) {
+            throw new ConnectionError('Cannot create model: session is read-only');
+        }
 
         // create new model
         const id = await type.getSchema().idGenerator.getNextId(this.logger, this as any); // TODO: get rid of any
@@ -144,8 +147,9 @@ export class DaoSession implements Dao {
     }
 
     delete<T extends Model>(model: T): T {
-
-        // TODO: check for read-only
+        if (this.isReadOnly) {
+            throw new ConnectionError('Cannot delete model: session is read-only');
+        }
 
         this.store.delete(model);
         return model;
@@ -157,16 +161,13 @@ export class DaoSession implements Dao {
         if (!this.isActive) {
             throw new ConnectionError('Cannot flush session: session has already been closed');
         }
-        
-        // don't attempt to sync read-only sessions when checkImmutable is not set
-        if (this.isReadOnly && !this.checkImmutable) return;
+        else if (this.isReadOnly) {
+            throw new ConnectionError('Cannot flush session: session is read-only');
+        }
 
         // build a list of sync queries
         const queries = this.store.getSyncQueries();
         if (queries.length === 0) return;
-        if (this.isReadOnly) {
-            throw new ConnectionError('Cannot flush session: dirty models detected in a read-only session');
-        }
 
         // execute sync queries
         const promises: Promise<any>[] = [];
@@ -196,16 +197,38 @@ export class DaoSession implements Dao {
         try {
             let closePromise: Promise<any>;
             if (action === 'commit') {
-                // TODO: flush changes
                 this.logger.debug('Committing and closing session');
-                closePromise = this.execute(COMMIT_TRANSACTION);
+
+                // flush changes
+                const flushPromises: Promise<any>[] = [];
+                if (this.checkImmutable || !this.isReadOnly) {
+                    const queries = this.store.getSyncQueries();
+                    if (queries.length > 0) {
+                        if (this.isReadOnly) throw new ConnectionError('Cannot close session: dirty models detected in read-only session');
+                        for (let query of queries) {
+                            flushPromises.push(this.execute(query));
+                        }
+                    }
+                }
+                
+                // commit the transaction
+                if (flushPromises.length > 0) {
+                    flushPromises.push(this.execute(COMMIT_TRANSACTION));
+                    closePromise = Promise.all(flushPromises);
+                }
+                else {
+                    closePromise = this.execute(COMMIT_TRANSACTION);
+                }
             }
             else if (action === 'rollback') {
+                // rollback the transaction
                 this.logger.debug('Committing and closing session');
                 closePromise = this.execute(ROLLBACK_TRANSACTION);
             }
+
             this.state = DaoState.closing;
             await closePromise!;
+            this.store.applyChanges();
         }
         catch (error) {
             closeError = new ConnectionError(`Cannot close session`, error);

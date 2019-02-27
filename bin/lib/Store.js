@@ -28,16 +28,8 @@ class Store {
     getAll(type) {
         if (!Model_1.isModelClass(type))
             throw new TypeError('Cannot get model: model type is invalid');
-        const models = [];
-        const storedModels = this.cache.get(type);
-        if (storedModels) {
-            for (let model of storedModels.values()) {
-                if (model.isDeleted)
-                    continue;
-                models.push(model);
-            }
-        }
-        return models;
+        const models = this.cache.get(type);
+        return models ? models : new Map();
     }
     // LOADING METHODS
     // --------------------------------------------------------------------------------------------

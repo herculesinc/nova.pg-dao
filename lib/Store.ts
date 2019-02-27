@@ -37,18 +37,11 @@ export class Store {
         }
     }
 
-    getAll<T extends Model>(type: typeof Model): T[] {
+    getAll<T extends Model>(type: typeof Model): ReadonlyMap<string, T> {
         if (!isModelClass(type)) throw new TypeError('Cannot get model: model type is invalid');
 
-        const models: T[] = [];
-        const storedModels = this.cache.get(type); 
-        if (storedModels) {
-            for (let model of storedModels.values()) {
-                if (model.isDeleted) continue;
-                models.push(model as T);
-            }
-        }
-        return models;
+        const models = this.cache.get(type); 
+        return models ? models : new Map();
     }
 
     // LOADING METHODS
