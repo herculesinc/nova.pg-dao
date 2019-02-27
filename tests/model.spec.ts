@@ -4,7 +4,7 @@ import { Model } from '../lib/Model';
 import { dbModel, dbField, PgIdGenerator, Timestamp } from '../index';
 import { ModelError } from '../lib/errors';
 
-const table = 'table';
+const table = 'test_table';
 const idGenerator = new PgIdGenerator(`${table}_seq`);
 
 let schema: any;
@@ -167,6 +167,125 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
             checkSchemaField('arrField', Array, 'Array');
         });
 
+    });
+
+    describe.only('Generation of Select/Insert/Update/Delete SQL statements', () => {
+        let TModel: any;
+
+        const selectTests = [
+            {mutable: true,  selector: undefined},
+            {mutable: false, selector: undefined},
+            {mutable: true,  selector: {id: 1}},
+            {mutable: false, selector: {id: 1}}
+        ];
+
+        beforeEach(() => {
+            @dbModel(table, idGenerator)
+            class TestModel extends Model {
+
+                @dbField(Number)
+                camelCase!: number;
+
+                @dbField(String)
+                simple!: string;
+            }
+
+            TModel = TestModel;
+        });
+
+        describe('qSelectAllModels() method should return correct statements', () => {
+            selectTests.forEach((test: any) => {
+                const {mutable, selector} = test;
+
+                it(`for mutable='${mutable}' and selector=${JSON.stringify(selector)}`, () => {
+                    const query = new TModel.qSelectAllModels(mutable, selector);
+
+                    expect(query.text).to.includes(`SELECT id, created_on AS "createdOn", updated_on AS "updatedOn", camel_case AS "camelCase", simple FROM ${table}`);
+
+                    if (mutable) {
+                        expect(query.text).to.includes('FOR UPDATE');
+                    } else {
+                        expect(query.text).to.not.includes('FOR UPDATE');
+                    }
+
+                    if (selector) {
+                        expect(query.text).to.includes('WHERE');
+                    } else {
+                        expect(query.text).to.not.includes('WHERE');
+                    }
+                });
+            });
+        });
+
+        describe('qSelectOneModel() method should return correct statements', () => {
+            selectTests.forEach((test: any) => {
+                const {mutable, selector} = test;
+
+                it(`for mutable='${mutable}' and selector=${JSON.stringify(selector)}`, () => {
+                    const query = new TModel.qSelectOneModel(mutable, selector);
+
+                    expect(query.text).to.includes(`SELECT id, created_on AS "createdOn", updated_on AS "updatedOn", camel_case AS "camelCase", simple FROM ${table}`);
+
+                    if (mutable) {
+                        expect(query.text).to.includes('FOR UPDATE');
+                    } else {
+                        expect(query.text).to.not.includes('FOR UPDATE');
+                    }
+
+                    expect(query.text).to.includes('WHERE');
+                });
+            });
+        });
+
+        describe('qInsertModel() method should return correct statements', () => {
+            it('with safe text', () => {
+                const testModel = new TModel({id: '1', createdOn: 2, updatedOn: 3, camelCase: 4, simple: 'Test_1'});
+                const query = new TModel.qInsertModel(testModel);
+
+                expect(query.text).to.includes(`INSERT INTO ${table} (id,created_on,updated_on,camel_case,simple)`);
+                expect(query.text).to.includes('VALUES (\'1\',2,3,4,\'Test_1\')');
+            });
+
+            it('with unsafe text', () => {
+                const testModel = new TModel({id: '1', createdOn: 2, updatedOn: 3, camelCase: 4, simple: 'Test\'1'});
+                const query = new TModel.qInsertModel(testModel);
+
+                expect(query.text).to.includes(`INSERT INTO ${table} (id,created_on,updated_on,camel_case,simple)`);
+                expect(query.text).to.includes('VALUES (\'1\',2,3,4,$1)');
+            });
+        });
+
+        describe('qUpdateModel() method should return correct statements', () => {
+            it('with safe text', () => {
+                const testModel = new TModel({id: '1', createdOn: 2, updatedOn: 3, camelCase: 4, simple: 'Test_1'});
+                const field = TModel.getSchema().fieldMap.get('simple');
+
+                const query = new TModel.qUpdateModel(testModel, [field]);
+
+                expect(query.text).to.includes(`UPDATE ${table}`);
+                expect(query.text).to.includes('SET simple=\'Test_1\' WHERE id = \'1\'');
+            });
+
+            it('with unsafe text', () => {
+                const testModel = new TModel({id: '1', createdOn: 2, updatedOn: 3, camelCase: 4, simple: 'Test\'1'});
+                const field = TModel.getSchema().fieldMap.get('simple');
+
+                const query = new TModel.qUpdateModel(testModel, [field]);
+
+                expect(query.text).to.includes(`UPDATE ${table}`);
+                expect(query.text).to.includes('SET simple=$1 WHERE id = \'1\'');
+            });
+        });
+
+        describe('qDeleteModel() method should return correct statements', () => {
+            it('should return correct statement', () => {
+                const testModel = new TModel({id: '1', createdOn: 2, updatedOn: 3, camelCase: 4, simple: 'Test_1'});
+
+                const query = new TModel.qDeleteModel(testModel);
+
+                expect(query.text).to.includes('DELETE FROM test_table WHERE id = \'1\'');
+            });
+        });
     });
 
     describe('Error conditions', () => {
