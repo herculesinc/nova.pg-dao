@@ -200,7 +200,7 @@ describe('NOVA.PG-DAO -> Model;', () => {
                 it(`for mutable='${mutable}' and selector=${JSON.stringify(selector)}`, () => {
                     const query = new TModel.qSelectAllModels(mutable, selector);
 
-                    expect(query.text).to.includes(`SELECT id, created_on AS "createdOn", updated_on AS "updatedOn", camel_case AS "camelCase", simple FROM ${table}`);
+                    expect(query.text).to.includes(`SELECT test_table.id, test_table.created_on AS "createdOn", test_table.updated_on AS "updatedOn", test_table.camel_case AS "camelCase", test_table.simple FROM ${table}`);
 
                     if (mutable) {
                         expect(query.text).to.includes('FOR UPDATE');
@@ -224,7 +224,7 @@ describe('NOVA.PG-DAO -> Model;', () => {
                 it(`for mutable='${mutable}' and selector=${JSON.stringify(selector)}`, () => {
                     const query = new TModel.qSelectOneModel(mutable, selector);
 
-                    expect(query.text).to.includes(`SELECT id, created_on AS "createdOn", updated_on AS "updatedOn", camel_case AS "camelCase", simple FROM ${table}`);
+                    expect(query.text).to.includes(`SELECT test_table.id, test_table.created_on AS "createdOn", test_table.updated_on AS "updatedOn", test_table.camel_case AS "camelCase", test_table.simple FROM ${table}`);
 
                     if (mutable) {
                         expect(query.text).to.includes('FOR UPDATE');

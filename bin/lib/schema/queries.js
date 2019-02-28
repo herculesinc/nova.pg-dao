@@ -91,10 +91,10 @@ function buildSelectText(schema) {
     const fieldGetters = [];
     for (let field of schema.fields) {
         if (field.name === field.snakeName) {
-            fieldGetters.push(field.name);
+            fieldGetters.push(`${schema.table}.${field.name}`);
         }
         else {
-            fieldGetters.push(`${field.snakeName} AS "${field.name}"`);
+            fieldGetters.push(`${schema.table}.${field.snakeName} AS "${field.name}"`);
         }
     }
     return fieldGetters.join(', ');
