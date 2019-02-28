@@ -3,10 +3,9 @@ import { expect } from 'chai';
 import { Model } from '../lib/Model';
 import { dbModel, dbField, PgIdGenerator, Timestamp } from '../index';
 import { ModelError } from '../lib/errors';
-import { symCreated, symDeleted, symMutable } from '../lib/Model';
 
 const table = 'test_table';
-const idGenerator = new PgIdGenerator(`${table}_seq`);
+const idGenerator = new PgIdGenerator(`${table}_id_seq`);
 const parser = (value: string): any => value;
 
 let schema: any;
@@ -323,9 +322,9 @@ describe('NOVA.PG-DAO -> Model;', () => {
                     expect(typeof (instanceData as any)[key]).to.equal(typeof instance[key]);
                 });
 
-                expect(instance[symMutable]).to.to.be.false;
-                expect(instance[symCreated]).to.to.be.false;
-                expect(instance[symDeleted]).to.to.be.false;
+                expect(instance.isMutable).to.to.be.false;
+                expect(instance.isCreated).to.to.be.false;
+                expect(instance.isDeleted).to.to.be.false;
             });
 
             it('should contain correct field data with clone key', () => {
@@ -344,9 +343,9 @@ describe('NOVA.PG-DAO -> Model;', () => {
                     expect(typeof (instanceData as any)[key]).to.equal(typeof instance[key]);
                 });
 
-                expect(instance[symMutable]).to.to.be.false;
-                expect(instance[symCreated]).to.to.be.false;
-                expect(instance[symDeleted]).to.to.be.false;
+                expect(instance.isMutable).to.to.be.false;
+                expect(instance.isCreated).to.to.be.false;
+                expect(instance.isDeleted).to.to.be.false;
             });
 
             it('when clone set to false, updating of instance data should affect of model', () => {
@@ -417,9 +416,9 @@ describe('NOVA.PG-DAO -> Model;', () => {
                     expect((instanceData as any)[key]).to.equal(instance[key]);
                 });
 
-                expect(instance[symMutable]).to.to.be.false;
-                expect(instance[symCreated]).to.to.be.false;
-                expect(instance[symDeleted]).to.to.be.false;
+                expect(instance.isMutable).to.to.be.false;
+                expect(instance.isCreated).to.to.be.false;
+                expect(instance.isDeleted).to.to.be.false;
             });
         });
     });

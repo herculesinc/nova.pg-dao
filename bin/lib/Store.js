@@ -71,6 +71,7 @@ class Store {
             model[Model_1.symCreated] = true;
             model[Model_1.symMutable] = true;
         }
+        storedModels.set(model.id, model);
         return model;
     }
     delete(model) {

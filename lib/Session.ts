@@ -150,8 +150,7 @@ export class DaoSession implements Dao {
         if (!this.isActive) {
             throw new ConnectionError('Cannot delete model: session has already been closed');
         }
-        else 
-        if (this.isReadOnly) {
+        else if (this.isReadOnly) {
             throw new ConnectionError('Cannot delete model: session is read-only');
         }
 
@@ -214,7 +213,7 @@ export class DaoSession implements Dao {
                         }
                     }
                 }
-                
+
                 // commit the transaction
                 if (flushPromises.length > 0) {
                     flushPromises.push(this.execute(COMMIT_TRANSACTION));
@@ -293,13 +292,13 @@ export class DaoSession implements Dao {
             process.nextTick(() => {
                 const commands = this.commands;
                 this.commands = [];
-    
+
                 for (let command of commands) {
                     this.client!.query(command as any);
                 }
             });
         }
-        
+
         // return the result
         return result;
     }

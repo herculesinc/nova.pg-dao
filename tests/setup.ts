@@ -65,10 +65,10 @@ export async function prepareDatabase(conn: DaoSession): Promise<any> {
         name: 'insertUsers',
         text: `SELECT * INTO TEMPORARY tmp_users
             FROM (VALUES 
-                (1::int, 'Irakliy'::VARCHAR, '["test","testing"]'::jsonb,   now()::timestamptz, now()::timestamptz),
-                (2::int, 'Yason'::VARCHAR, 	 '["test1","testing1"]'::jsonb, now()::timestamptz, now()::timestamptz),
-                (3::int, 'George'::VARCHAR,  '["test2","testing2"]'::jsonb, now()::timestamptz, now()::timestamptz),
-                (4::int, 'T''est'::VARCHAR,  '["test3","testing3"]'::jsonb, now()::timestamptz, now()::timestamptz)
+                (setval('tmp_users_id_seq', 1, true), 'Irakliy'::VARCHAR, '["test","testing"]'::jsonb,   now()::timestamptz, now()::timestamptz),
+                (setval('tmp_users_id_seq', 2, true), 'Yason'::VARCHAR,   '["test1","testing1"]'::jsonb, now()::timestamptz, now()::timestamptz),
+                (setval('tmp_users_id_seq', 3, true), 'George'::VARCHAR,  '["test2","testing2"]'::jsonb, now()::timestamptz, now()::timestamptz),
+                (setval('tmp_users_id_seq', 4, true), 'T''est'::VARCHAR,  '["test3","testing3"]'::jsonb, now()::timestamptz, now()::timestamptz)
             ) AS q (id, username, tags, created_on, updated_on);`
     });
 }

@@ -30,7 +30,7 @@ export class Store {
         if (!isModelClass(type)) throw new TypeError('Cannot get model: model type is invalid');
         if (typeof id !== 'string') throw new TypeError('Cannot get model: model id is invalid');
 
-        const storedModels = this.cache.get(type); 
+        const storedModels = this.cache.get(type);
         if (storedModels) {
             const model = storedModels.get(id);
             if (model && !model.isDeleted) return model as T;
@@ -40,7 +40,7 @@ export class Store {
     getAll<T extends Model>(type: typeof Model): ReadonlyMap<string, T> {
         if (!isModelClass(type)) throw new TypeError('Cannot get model: model type is invalid');
 
-        const models = this.cache.get(type); 
+        const models = this.cache.get(type);
         return models ? models : new Map();
     }
 
@@ -48,7 +48,7 @@ export class Store {
     // --------------------------------------------------------------------------------------------
     load(modelClass: typeof Model, rows: string[][], fields: FieldDescriptor[], mutable: boolean) {
         if (!isModelClass(modelClass)) throw new TypeError('Cannot load model: model class is invalid');
-        
+
         const models: Model[] = [];
         const storedModels = this.getModelMap(modelClass, true)!;
 
@@ -84,6 +84,8 @@ export class Store {
             model[symCreated] = true;
             model[symMutable] = true;
         }
+
+        storedModels.set(model.id, model);
 
         return model;
     }
@@ -149,7 +151,7 @@ export class Store {
     }
 
     applyChanges() {
-        
+
         for (let models of this.cache.values()) {
             for (let model of models.values()) {
                 if (!model.isMutable) continue;
