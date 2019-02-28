@@ -763,21 +763,21 @@ describe('NOVA.PG-DAO -> Model;', () => {
                     const invalidSeedErrorText = 'Model seed is invalid';
 
                     [
-                        {seed: undefined,                                  ErrorType: TypeError,  error: 'Model seed is undefined'},
+                        {seed: undefined,                                  ErrorType: TypeError,  error: invalidSeedErrorText},
                         {seed: null,                                       ErrorType: TypeError,  error: invalidSeedErrorText},
                         {seed: '',                                         ErrorType: TypeError,  error: invalidSeedErrorText},
                         {seed: 1234,                                       ErrorType: TypeError,  error: invalidSeedErrorText},
 
-                        {seed: {},                                         ErrorType: ModelError, error: 'Model ID is undefined'},
-                        {seed: {id: null},                                 ErrorType: ModelError, error: 'Model ID is null'},
+                        {seed: {},                                         ErrorType: ModelError, error: 'Model ID is invalid'},
+                        {seed: {id: null},                                 ErrorType: ModelError, error: 'Model ID is invalid'},
                         {seed: {id: 0},                                    ErrorType: ModelError, error: 'Model ID is invalid'},
                         {seed: {id: 1},                                    ErrorType: ModelError, error: 'Model ID is invalid'},
 
-                        {seed: {id: '1'},                                  ErrorType: ModelError, error: 'Model createdOn is undefined'},
-                        {seed: {id: '1', createdOn: null},                 ErrorType: ModelError, error: 'Model createdOn is null'},
+                        {seed: {id: '1'},                                  ErrorType: ModelError, error: 'Model createdOn is invalid'},
+                        {seed: {id: '1', createdOn: null},                 ErrorType: ModelError, error: 'Model createdOn is invalid'},
 
-                        {seed: {id: '1', createdOn: 123},                  ErrorType: ModelError, error: 'Model updatedOn is undefined'},
-                        {seed: {id: '1', createdOn: 123, updatedOn: null}, ErrorType: ModelError, error: 'Model updatedOn is null'},
+                        {seed: {id: '1', createdOn: 123},                  ErrorType: ModelError, error: 'Model updatedOn is invalid'},
+                        {seed: {id: '1', createdOn: 123, updatedOn: null}, ErrorType: ModelError, error: 'Model updatedOn is invalid'},
 
                     ].forEach((test: any) => {
                         const {seed, error, ErrorType} = test;
@@ -806,22 +806,48 @@ describe('NOVA.PG-DAO -> Model;', () => {
             });
 
             describe('with string[] seed', () => {
+                
+                describe('rowData section', () => {
+                    [
+                        {rowData: [],        error: 'Model row data is inconsistent'}
+                    ].forEach((test: any) => {
+                        const {rowData, error} = test;
+
+                        it(`should throw an error for rowData=${JSON.stringify(rowData)}`, () => {
+                            expect(() => {
+                                new TModel(rowData, []);
+                            }).to.throw(ModelError, error);
+                        });
+                    });
+                });
+
                 describe('fields section', () => {
                     const invalidFieldsErrorText = 'Model fields are invalid';
                     [
-                        {fields: undefined, error: 'Models fields are undefined'},
+                        {fields: undefined, error: invalidFieldsErrorText},
                         {fields: null,      error: invalidFieldsErrorText},
                         {fields: '',        error: invalidFieldsErrorText},
                         {fields: true,      error: invalidFieldsErrorText},
                         {fields: {},        error: invalidFieldsErrorText},
-                        {fields: [],        error: invalidFieldsErrorText}
                     ].forEach((test: any) => {
                         const {fields, error} = test;
 
-                        it(`should throw an error for seed=${JSON.stringify(fields)}`, () => {
+                        it(`should throw an error for fields=${JSON.stringify(fields)}`, () => {
                             expect(() => {
-                                new TModel([], fields);
+                                new TModel(['1', Date.now(), Date.now(), 2], fields);
                             }).to.throw(TypeError, error);
+                        });
+                    });
+
+                    [
+                        {fields: [],        error: 'Model fields are inconsistent'},
+                    ].forEach((test: any) => {
+                        const {fields, error} = test;
+
+                        it(`should throw an error for fields=${JSON.stringify(fields)}`, () => {
+                            expect(() => {
+                                new TModel(['1', Date.now(), Date.now(), 2], fields);
+                            }).to.throw(ModelError, error);
                         });
                     });
                 });

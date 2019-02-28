@@ -34,19 +34,15 @@ class Model {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     constructor(seed, fieldsOrClone) {
-        if (!seed)
-            throw new TypeError('Model seed is undefined');
         if (Array.isArray(seed)) {
             // the model is being built from database row
-            if (!fieldsOrClone)
-                throw new TypeError('Models fields are undefined');
             if (!Array.isArray(fieldsOrClone))
                 throw new TypeError('Model fields are invalid');
             this.infuse(seed, fieldsOrClone);
         }
         else {
             // the model is being built from an object
-            if (typeof seed !== 'object' || seed === null)
+            if (!seed || typeof seed !== 'object')
                 throw new TypeError('Model seed is invalid');
             const clone = (fieldsOrClone === undefined) ? false : fieldsOrClone;
             if (typeof clone !== 'boolean')
@@ -68,12 +64,12 @@ class Model {
             }
         }
         // validate required fields
-        if (!this.id)
-            throw new errors_1.ModelError('Model ID is undefined');
-        if (!this.createdOn)
-            throw new errors_1.ModelError('Model createdOn is undefined');
-        if (!this.updatedOn)
-            throw new errors_1.ModelError('Model updatedOn is undefined');
+        if (!this.id || typeof this.id !== 'string')
+            throw new errors_1.ModelError('Model ID is invalid');
+        if (!this.createdOn || typeof this.createdOn !== 'number')
+            throw new errors_1.ModelError('Model createdOn is invalid');
+        if (!this.updatedOn || typeof this.updatedOn !== 'number')
+            throw new errors_1.ModelError('Model updatedOn is invalid');
         // initialize internal state
         this[exports.symMutable] = false;
         this[exports.symCreated] = false;
@@ -140,10 +136,14 @@ class Model {
     // MODEL METHODS
     // --------------------------------------------------------------------------------------------
     infuse(rowData, dbFields) {
-        const schema = this.constructor.getSchema();
+        const fields = this.constructor.getSchema().fields;
+        if (fields.length !== rowData.length)
+            throw new errors_1.ModelError('Model row data is inconsistent');
+        if (fields.length !== dbFields.length)
+            throw new errors_1.ModelError('Model fields are inconsistent');
         const original = {};
-        for (let i = 0; i < schema.fields.length; i++) {
-            let field = schema.fields[i];
+        for (let i = 0; i < fields.length; i++) {
+            let field = fields[i];
             let fieldName = field.name;
             let fieldValue = field.parse ? field.parse(rowData[i]) : dbFields[i].parser(rowData[i]);
             this[fieldName] = fieldValue;

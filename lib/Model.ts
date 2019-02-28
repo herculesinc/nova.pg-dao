@@ -54,17 +54,14 @@ export class Model implements IModel {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     constructor(seed: string[] | object, fieldsOrClone?: FieldDescriptor[] | boolean) {
-        if (!seed) throw new TypeError('Model seed is undefined');
-
         if (Array.isArray(seed)) {
             // the model is being built from database row
-            if (!fieldsOrClone) throw new TypeError('Models fields are undefined');
             if (!Array.isArray(fieldsOrClone)) throw new TypeError('Model fields are invalid');
             this.infuse(seed, fieldsOrClone);
         }
         else {
             // the model is being built from an object
-            if (typeof seed !== 'object' || seed === null) throw new TypeError('Model seed is invalid');
+            if (!seed || typeof seed !== 'object') throw new TypeError('Model seed is invalid');
             const clone = (fieldsOrClone === undefined) ? false: fieldsOrClone;
             if (typeof clone !== 'boolean') throw new TypeError('Clone flag is invalid');
 
@@ -86,9 +83,9 @@ export class Model implements IModel {
         }
 
         // validate required fields
-        if (!this.id) throw new ModelError('Model ID is undefined');
-        if (!this.createdOn) throw new ModelError('Model createdOn is undefined');
-        if (!this.updatedOn) throw new ModelError('Model updatedOn is undefined');
+        if (!this.id || typeof this.id !== 'string') throw new ModelError('Model ID is invalid');
+        if (!this.createdOn || typeof this.createdOn !== 'number') throw new ModelError('Model createdOn is invalid');
+        if (!this.updatedOn || typeof this.updatedOn !== 'number') throw new ModelError('Model updatedOn is invalid');
 
         // initialize internal state
         this[symMutable] = false;
@@ -169,10 +166,13 @@ export class Model implements IModel {
     // MODEL METHODS
     // --------------------------------------------------------------------------------------------
     infuse(rowData: string[], dbFields: FieldDescriptor[]) {
-        const schema = (this.constructor as typeof Model).getSchema();
+        const fields = (this.constructor as typeof Model).getSchema().fields;
+        if (fields.length !== rowData.length) throw new ModelError('Model row data is inconsistent');
+        if (fields.length !== dbFields.length) throw new ModelError('Model fields are inconsistent');
+
         const original: any = {};
-        for (let i = 0; i < schema.fields.length; i++) {
-            let field = schema.fields[i];
+        for (let i = 0; i < fields.length; i++) {
+            let field = fields[i];
             let fieldName = field.name as keyof this;
             let fieldValue = field.parse ? field.parse(rowData[i]) : dbFields[i].parser(rowData[i]);
             this[fieldName] = fieldValue;
