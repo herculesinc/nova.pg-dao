@@ -3,38 +3,41 @@ import { expect } from 'chai';
 import { Model } from '../lib/Model';
 import { dbModel, dbField, PgIdGenerator, Timestamp } from '../index';
 import { ModelError } from '../lib/errors';
+import { symCreated, symDeleted, symMutable } from '../lib/Model';
 
 const table = 'test_table';
 const idGenerator = new PgIdGenerator(`${table}_seq`);
 
 let schema: any;
 
-describe('NOVA.PG-DAO -> Model;', () => {
-    it('should create new model without errors', () => {
-        expect(() => {
-            class TestModel extends Model {
-            }
-        }).to.not.throw();
-    });
+describe.only('NOVA.PG-DAO -> Model;', () => {
+    describe('Creating of model', () => {
+        it('should create new model without errors', () => {
+            expect(() => {
+                class TestModel extends Model {
+                }
+            }).to.not.throw();
+        });
 
-    it('should create new model by decorator without errors', () => {
-        expect(() => {
+        it('should create new model by decorator without errors', () => {
+            expect(() => {
+                @dbModel(table, idGenerator)
+                class TestModel extends Model {
+                    @dbField(Number)
+                    num!: number;
+                }
+            }).to.not.throw();
+        });
+
+        it('should be linked to correct db table', () => {
             @dbModel(table, idGenerator)
             class TestModel extends Model {
                 @dbField(Number)
                 num!: number;
             }
-        }).to.not.throw();
-    });
 
-    it('should be linked to correct db table', () => {
-        @dbModel(table, idGenerator)
-        class TestModel extends Model {
-            @dbField(Number)
-            num!: number;
-        }
-
-        expect(TestModel.getSchema().table).to.equal(table);
+            expect(TestModel.getSchema().table).to.equal(table);
+        });
     });
 
     describe('Default fields', () => {
@@ -173,8 +176,6 @@ describe('NOVA.PG-DAO -> Model;', () => {
         let TModel: any;
 
         const selectTests = [
-            {mutable: true,  selector: undefined},
-            {mutable: false, selector: undefined},
             {mutable: true,  selector: {id: 1}},
             {mutable: false, selector: {id: 1}}
         ];
@@ -182,7 +183,6 @@ describe('NOVA.PG-DAO -> Model;', () => {
         beforeEach(() => {
             @dbModel(table, idGenerator)
             class TestModel extends Model {
-
                 @dbField(Number)
                 camelCase!: number;
 
@@ -284,6 +284,145 @@ describe('NOVA.PG-DAO -> Model;', () => {
                 const query = new TModel.qDeleteModel(testModel);
 
                 expect(query.text).to.includes('DELETE FROM test_table WHERE id = \'1\'');
+            });
+        });
+    });
+
+    describe('Instantiating of model', () => {
+        let TModel: any;
+        let instanceData: any;
+
+        beforeEach(() => {
+            @dbModel(table, idGenerator)
+            class TestModel extends Model {
+                @dbField(Number)
+                num!: number;
+
+                @dbField(Object)
+                obj!: any;
+            }
+
+            TModel = TestModel;
+
+            instanceData = {id: 1, createdOn: Date.now(), updatedOn: Date.now(), num: 123, obj: {a: '345'}};
+        });
+
+        describe('with object seed', () => {
+            it('should instantiate model without errors', () => {
+                expect(() => {
+                    new TModel(instanceData);
+                }).to.not.throw();
+            });
+
+            it('should contain correct field data without clone key', () => {
+                const instance = new TModel(instanceData);
+
+                Object.keys(instanceData).forEach(key => {
+                    expect((instanceData as any)[key]).to.equal(instance[key]);
+                    expect(typeof (instanceData as any)[key]).to.equal(typeof instance[key]);
+                });
+
+                expect(instance[symMutable]).to.to.be.false;
+                expect(instance[symCreated]).to.to.be.false;
+                expect(instance[symDeleted]).to.to.be.false;
+            });
+
+            it('should contain correct field data with clone key', () => {
+                const instance = new TModel(instanceData, true);
+
+                Object.keys(instanceData).forEach(key => {
+                    const value = (instanceData as any)[key];
+
+                    if (typeof value === 'object') {
+                        expect((instanceData as any)[key]).to.not.equal(instance[key]);
+                        expect((instanceData as any)[key]).to.deep.equal(instance[key]);
+                    } else {
+                        expect((instanceData as any)[key]).to.equal(instance[key]);
+                    }
+
+                    expect(typeof (instanceData as any)[key]).to.equal(typeof instance[key]);
+                });
+
+                expect(instance[symMutable]).to.to.be.false;
+                expect(instance[symCreated]).to.to.be.false;
+                expect(instance[symDeleted]).to.to.be.false;
+            });
+
+            it('when clone set to false, updating of instance data should affect of model', () => {
+                const instance = new TModel(instanceData, false);
+
+                expect(instanceData.obj.b).to.be.undefined;
+                expect(instanceData.obj).to.equal(instance.obj);
+
+                instanceData.obj.b = 125;
+
+                expect(instanceData.obj.b).to.not.be.undefined;
+                expect(instance.obj.b).to.not.be.undefined;
+                expect(instanceData.obj).to.equal(instance.obj);
+
+                delete instance.obj.b;
+
+                expect(instanceData.obj.b).to.be.undefined;
+                expect(instance.obj.b).to.be.undefined;
+                expect(instanceData.obj).to.equal(instance.obj);
+            });
+
+            it('when clone set to false, updating of instance data should not affect of model', () => {
+                const instance = new TModel(instanceData, true);
+
+                expect(instanceData.obj.b).to.be.undefined;
+                expect(instanceData.obj).to.not.equal(instance.obj);
+                expect(instanceData.obj).to.deep.equal(instance.obj);
+
+                instanceData.obj.b = 125;
+
+                expect(instanceData.obj.b).to.not.be.undefined;
+                expect(instance.obj.b).to.be.undefined;
+                expect(instanceData.obj).to.not.equal(instance.obj);
+                expect(instanceData.obj).to.not.deep.equal(instance.obj);
+
+                instance.obj.b = 245;
+
+                expect(instanceData.obj.b).to.not.be.undefined;
+                expect(instance.obj.b).to.not.be.undefined;
+                expect(instanceData.obj).to.not.equal(instance.obj);
+                expect(instanceData.obj).to.not.deep.equal(instance.obj);
+            });
+        });
+
+        describe('with string[] seed', () => {
+            let data: Array<string>, fields: Array<any>;
+
+            beforeEach(() => {
+                const keys = Object.keys(instanceData);
+
+                data = keys.map(key => (instanceData as any)[key]);
+
+                fields = keys.map((key: string, index: number) => {
+                    return {
+                        name  : key,
+                        oid   : index,
+                        parser: (value: string): any => value
+                    };
+                });
+            });
+
+            it('should instantiate model without errors', () => {
+                expect(() => {
+                    new TModel(data, fields);
+                }).to.not.throw();
+            });
+
+            it('should contain correct field data', () => {
+                const instance = new TModel(data, fields);
+
+                Object.keys(instanceData).forEach(key => {
+                    expect((instanceData as any)[key]).to.equal(instance[key]);
+                });
+
+                expect(instance[symMutable]).to.to.be.false;
+                expect(instance[symCreated]).to.to.be.false;
+                expect(instance[symDeleted]).to.to.be.false;
             });
         });
     });
@@ -449,6 +588,135 @@ describe('NOVA.PG-DAO -> Model;', () => {
 
                         dbField(type, {handler})(TestModel, 'test');
                     }).to.throw(ModelError, errorText);
+                });
+            });
+        });
+
+        describe('Generation of Select SQL statements', () => {
+            let TModel: any;
+
+            const whereUndefinedErrorText = 'WHERE condition is undefined';
+
+            const tests = [
+                {selector: undefined, type: 'undefined', ErrorType: ModelError, error: whereUndefinedErrorText},
+                {selector: null,      type: 'null',      ErrorType: ModelError, error: whereUndefinedErrorText},
+                {selector: 0,         type: 0,           ErrorType: ModelError, error: whereUndefinedErrorText},
+                {selector: 123,       type: '123',       ErrorType: TypeError,  error: 'Cannot build a fetch query: model selector is invalid'},
+                {selector: ['test'],  type: 'String[]',  ErrorType: ModelError, error: 'Cannot build fetch query: model selector and schema are incompatible'},
+            ];
+
+            beforeEach(() => {
+                @dbModel(table, idGenerator)
+                class TestModel extends Model {
+                    @dbField(String)
+                    simple!: string;
+                }
+
+                TModel = TestModel;
+            });
+
+            tests.forEach((test: any) => {
+                const {selector, type, error, ErrorType} = test;
+
+                it(`should throw an error for qSelectAllModels() method when selector is ${type}`, () => {
+                    expect(() => {
+                        const query = new TModel.qSelectAllModels(true, selector);
+                        query.text;
+                    }).to.throw(ErrorType, error);
+                });
+            });
+
+            tests.forEach((test: any) => {
+                const {selector, type, error, ErrorType} = test;
+
+                it(`should throw an error for qSelectOneModel() method when selector is ${type}`, () => {
+                    expect(() => {
+                        const query = new TModel.qSelectOneModel(true, selector);
+                        query.text;
+                    }).to.throw(ErrorType, error);
+                });
+            });
+        });
+
+        describe('Instantiating of model', () => {
+            let TModel: any;
+
+            beforeEach(() => {
+                @dbModel(table, idGenerator)
+                class TestModel extends Model {
+                    @dbField(Number)
+                    num!: number;
+                }
+
+                TModel = TestModel;
+            });
+
+            describe('with object seed', () => {
+                describe('seed section', () => {
+                    const invalidSeedErrorText = 'Model seed is invalid';
+
+                    [
+                        {seed: undefined,                                ErrorType: TypeError,  error: 'Model seed is undefined'},
+                        {seed: null,                                     ErrorType: TypeError,  error: invalidSeedErrorText},
+                        {seed: '',                                       ErrorType: TypeError,  error: invalidSeedErrorText},
+                        {seed: 1234,                                     ErrorType: TypeError,  error: invalidSeedErrorText},
+
+                        {seed: {},                                       ErrorType: ModelError, error: 'Model ID is undefined'},
+                        {seed: {id: null},                               ErrorType: ModelError, error: 'Model ID is null'},
+
+                        {seed: {id: 1},                                  ErrorType: ModelError, error: 'Model createdOn is undefined'},
+                        {seed: {id: 1, createdOn: null},                 ErrorType: ModelError, error: 'Model createdOn is null'},
+
+                        {seed: {id: 1, createdOn: 123},                  ErrorType: ModelError, error: 'Model updatedOn is undefined'},
+                        {seed: {id: 1, createdOn: 123, updatedOn: null}, ErrorType: ModelError, error: 'Model updatedOn is null'},
+
+                    ].forEach((test: any) => {
+                        const {seed, error, ErrorType} = test;
+
+                        it(`should throw an error for seed=${JSON.stringify(seed)}`, () => {
+                            expect(() => {
+                                new TModel(seed as any);
+                            }).to.throw(ErrorType, error);
+                        });
+                    });
+                });
+
+                describe('clone section', () => {
+                    [
+                        '', 'test', 'true',
+                        0, 123,
+                        {}
+                    ].forEach((cloneFlag: any) => {
+                        it(`should throw an error for cloneFlag=${JSON.stringify(cloneFlag)}`, () => {
+                            expect(() => {
+                                new TModel({id: 1, createdOn: 1, updatedOn: 1, num: 3}, cloneFlag);
+                            }).to.throw(TypeError, 'Clone flag is invalid');
+                        });
+                    });
+                });
+            });
+
+            describe('with string[] seed', () => {
+                describe('fields section', () => {
+                    const invalidFieldsErrorText = 'Model fields are invalid';
+                    [
+                        {fields: undefined, error: 'Models fields are undefined'},
+                        {fields: null,      error: invalidFieldsErrorText},
+                        {fields: '',        error: invalidFieldsErrorText},
+                        {fields: true,      error: invalidFieldsErrorText},
+                        {fields: {},        error: invalidFieldsErrorText},
+                        {fields: [],        error: invalidFieldsErrorText},
+                        {fields: ['test'],  error: invalidFieldsErrorText},
+                        {fields: [{}],      error: invalidFieldsErrorText},
+                    ].forEach((test: any) => {
+                        const {fields, error} = test;
+
+                        it(`should throw an error for seed=${JSON.stringify(fields)}`, () => {
+                            expect(() => {
+                                new TModel([], fields);
+                            }).to.throw(TypeError, error);
+                        });
+                    });
                 });
             });
         });

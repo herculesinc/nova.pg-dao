@@ -76,7 +76,7 @@ export function buildSelectQueryClass(schema: DbSchema, mask: QueryMask, modelTy
 // ================================================================================================
 export function buildInsertQueryClass(schema: DbSchema): InsertModelQuery {
     if (!schema) throw new ModelError('Cannot build INSERT query template: model schema is undefined');
-    
+
     const fields: string[] = [];
     const params: string[] = [];
 
@@ -95,10 +95,10 @@ export function buildInsertQueryClass(schema: DbSchema): InsertModelQuery {
 // ================================================================================================
 export function buildUpdateQueryClass(schema: DbSchema): UpdateModelQuery {
     if (!schema) throw new ModelError('Cannot build UPDATE query: model schema is undefined');
-    
+
     const queryName = `qUpdate${schema.name}Model`;
     const queryBase = `UPDATE ${schema.table} SET`;
-    
+
     return class implements Query {
 
         name    : string;
@@ -106,7 +106,7 @@ export function buildUpdateQueryClass(schema: DbSchema): UpdateModelQuery {
         values? : any[];
 
         constructor(model: Model, changes: DbField[]) {
-            
+
             const values: any[] = [];
             const setters: string[] = [];
             for (let field of changes) {
@@ -129,8 +129,8 @@ export function buildUpdateQueryClass(schema: DbSchema): UpdateModelQuery {
 // ================================================================================================
 export function buildDeleteQueryClass(schema: DbSchema): DeleteModelQuery {
     if (!schema) throw new ModelError('Cannot build DELETE query template: model schema is undefined');
-    
-    const name = `qDelete${schema.name}Model`
+
+    const name = `qDelete${schema.name}Model`;
     const text = `DELETE FROM ${schema.table} WHERE id = {{id}};`;
 
     return Query.template(text, name);
@@ -154,7 +154,7 @@ function buildSelectText(schema: DbSchema): string {
 }
 
 function buildWhereText(schema: DbSchema, selector: ModelSelector, values: any[]): string {
-    
+
     let where: string;
 
     if (typeof selector === 'string') {

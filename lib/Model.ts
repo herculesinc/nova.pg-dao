@@ -19,7 +19,7 @@ export function getModelClass(model: Model): typeof Model {
     const modelClass = model.constructor as typeof Model;
     if (modelClass.prototype instanceof Model === false) {
         throw new TypeError('Model is invalid');
-    } 
+    }
     return modelClass;
 }
 
@@ -41,7 +41,7 @@ export class Model implements IModel {
     static qUpdateModel     : UpdateModelQuery;
     static qDeleteModel     : DeleteModelQuery;
 
-    readonly id!            : string;    
+    readonly id!            : string;
     readonly createdOn!     : number;
     updatedOn!              : number;
 
@@ -89,7 +89,7 @@ export class Model implements IModel {
         if (!this.id) throw new ModelError('Model ID is undefined');
         if (!this.createdOn) throw new ModelError('Model createdOn is undefined');
         if (!this.updatedOn) throw new ModelError('Model updatedOn is undefined');
-        
+
         // initialize internal state
         this[symMutable] = false;
         this[symCreated] = false;
@@ -242,7 +242,7 @@ export class Model implements IModel {
     private buildInsertQuery() {
         const schema = (this.constructor as typeof Model).getSchema();
         const qInsertModel = (this.constructor as typeof Model).qInsertModel;
-        
+
         // make sure fields with custom serialization are treated correctly
         if (schema.hasCustomSerializers) {
             const params: any = {};
