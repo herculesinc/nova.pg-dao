@@ -33,10 +33,15 @@ class DbField {
         switch (this.type) {
             case Number:
             case String:
-            case types_1.Timestamp:
             case Boolean: {
                 if (handler)
-                    throw new errors_1.ModelError('Cannot specify custom handler for Number, String, or Timestamp fields');
+                    throw new errors_1.ModelError('Cannot specify custom handler for Number, String, or Boolean fields');
+                break;
+            }
+            case types_1.Timestamp: {
+                if (handler)
+                    throw new errors_1.ModelError('Cannot specify custom handler for Timestamp fields');
+                this.parse = types_1.Timestamp.parse;
                 break;
             }
             case Date: {

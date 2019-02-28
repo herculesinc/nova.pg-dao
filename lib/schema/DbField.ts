@@ -43,10 +43,15 @@ export class DbField implements IDbField {
 
 		// validate type and set parser, cloner, comparator, and serializer
     	switch (this.type) {
-        	case Number: case String: case Timestamp: case Boolean:	{
-                if (handler) throw new ModelError('Cannot specify custom handler for Number, String, or Timestamp fields');
+        	case Number: case String: case Boolean:	{
+                if (handler) throw new ModelError('Cannot specify custom handler for Number, String, or Boolean fields');
                 break;
-            }
+			}
+			case Timestamp: {
+				if (handler) throw new ModelError('Cannot specify custom handler for Timestamp fields');
+				this.parse = Timestamp.parse;
+				break;
+			}
 			case Date: {
                 if (handler) throw new ModelError('Cannot specify custom handler for Date field');
 				this.clone = util.cloneDate;

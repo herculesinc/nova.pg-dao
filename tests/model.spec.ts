@@ -671,7 +671,6 @@ describe('NOVA.PG-DAO -> Model;', () => {
         });
 
         describe('Model field handler section', () => {
-            const numberTypeHandler = 'Cannot specify custom handler for Number, String, or Timestamp fields';
 
             const handler: any = {
                 parse   : (value: string): string => value,
@@ -679,10 +678,17 @@ describe('NOVA.PG-DAO -> Model;', () => {
                 areEqual: (value1: any, value2: any): boolean => value1 !== value2
             };
 
-            [Number, String, Timestamp, Boolean, Date].forEach(type => {
-                const errorText = type === Date
-                    ? 'Cannot specify custom handler for Date field'
-                    : 'Cannot specify custom handler for Number, String, or Timestamp fields';
+            [Number, String, Boolean, Timestamp, Date].forEach(type => {
+                let errorText: string;
+                if (type === Date) {
+                    errorText = 'Cannot specify custom handler for Date field';
+                }
+                else if (type === Timestamp) {
+                    errorText = 'Cannot specify custom handler for Timestamp fields';
+                }
+                else {
+                    errorText = 'Cannot specify custom handler for Number, String, or Boolean fields';
+                }
 
                 it(`should throw an error when model field readonly is ${type}`, () => {
                     expect(() => {

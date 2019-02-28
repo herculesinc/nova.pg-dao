@@ -28,7 +28,7 @@ const idHandler: QueryHandler = {
     parse: (row: any[]): any => row[0]
 };
 
-describe.only('NOVA.PG-DAO -> Session;', () => {
+describe('NOVA.PG-DAO -> Session;', () => {
     describe('Query tests;', () => {
         beforeEach(async () => {
             db = new Database(settings);
@@ -382,7 +382,7 @@ describe.only('NOVA.PG-DAO -> Session;', () => {
         });
     });
 
-    describe.only('fetch/get/create/delete methods tests;', () => {
+    describe('fetch/get/create/delete methods tests;', () => {
         let UserModel: any;
 
         const table = 'tmp_users';
@@ -621,22 +621,15 @@ describe.only('NOVA.PG-DAO -> Session;', () => {
 
             it('should create new record in db', async () => {
                 const user = await session.create(UserModel, {username: 'username', tags: [1,2]});
-
                 await session.close('commit');
 
                 session = db.getSession(options, logger);
-
-                const fetchedUser: any = await session.fetchAll(UserModel, {id: user.id});
+                const fetchedUser = await session.fetchOne(UserModel, { id: user.id });
 
                 expect(fetchedUser).to.not.be.undefined;
                 expect(fetchedUser.id).to.equal(user.id);
                 expect(fetchedUser.username).to.equal(user.username);
-                expect(fetchedUser.tags).to.deep.equal(user.id.tags);
-
-                expect(fetchedUser.isMutable).to.be.true;
-                // expect(fetchedUser.isModified).to.be.false; //todo fix
-                expect(fetchedUser.isCreated).to.be.true;
-                expect(fetchedUser.isDeleted).to.be.false;
+                expect(fetchedUser.tags).to.deep.equal(user.tags);
             });
         });
     });
@@ -751,7 +744,7 @@ describe.only('NOVA.PG-DAO -> Session;', () => {
             expect(session.isActive).to.to.be.true;
         });
 
-        describe.only('Trying to fetch for update/create/delete models in a read-only session should throw errors', () => {
+        describe('Trying to fetch for update/create/delete models in a read-only session should throw errors', () => {
             let UserModel: any;
 
             const readOnlyOpts = {...options, readonly: true};

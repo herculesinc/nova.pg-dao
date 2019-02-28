@@ -62,13 +62,21 @@ export async function prepareDatabase(conn: DaoSession): Promise<any> {
         text: `DROP TABLE IF EXISTS tmp_users;`
     });
     await conn.execute({
+        name: 'dropSequence',
+        text: `DROP SEQUENCE IF EXISTS tmp_users_id_seq;`
+    });
+    await conn.execute({
+        name: 'createSequence',
+        text: `CREATE TEMPORARY SEQUENCE tmp_users_id_seq START 5;`
+    });
+    await conn.execute({
         name: 'insertUsers',
         text: `SELECT * INTO TEMPORARY tmp_users
             FROM (VALUES 
-                (setval('tmp_users_id_seq', 1, true), 'Irakliy'::VARCHAR, '["test","testing"]'::jsonb,   now()::timestamptz, now()::timestamptz),
-                (setval('tmp_users_id_seq', 2, true), 'Yason'::VARCHAR,   '["test1","testing1"]'::jsonb, now()::timestamptz, now()::timestamptz),
-                (setval('tmp_users_id_seq', 3, true), 'George'::VARCHAR,  '["test2","testing2"]'::jsonb, now()::timestamptz, now()::timestamptz),
-                (setval('tmp_users_id_seq', 4, true), 'T''est'::VARCHAR,  '["test3","testing3"]'::jsonb, now()::timestamptz, now()::timestamptz)
+                (1::bigint, 'Irakliy'::text, '["test","testing"]'::jsonb,   extract(epoch from now())::bigint, extract(epoch from now())::bigint),
+                (2::bigint, 'Yason'::text,   '["test1","testing1"]'::jsonb, extract(epoch from now())::bigint, extract(epoch from now())::bigint),
+                (3::bigint, 'George'::text,  '["test2","testing2"]'::jsonb, extract(epoch from now())::bigint, extract(epoch from now())::bigint),
+                (4::bigint, 'T''est'::text,  '["test3","testing3"]'::jsonb, extract(epoch from now())::bigint, extract(epoch from now())::bigint)
             ) AS q (id, username, tags, created_on, updated_on);`
     });
 }
