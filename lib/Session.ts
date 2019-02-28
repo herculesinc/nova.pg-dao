@@ -81,7 +81,7 @@ export class DaoSession implements Dao {
         if (!isModelClass(type)) {
             throw new TypeError('Cannot fetch model: model type is invalid');
         }
-        else if (typeof selector !== 'object' || selector === null) {
+        else if (!selector || (typeof selector !== 'object' && typeof selector !== 'string')) {
             throw new TypeError('Cannot fetch model: selector is invalid');
         }
         else if (forUpdate !== undefined && typeof forUpdate !== 'boolean') {
@@ -100,7 +100,7 @@ export class DaoSession implements Dao {
         if (!isModelClass(type)) {
             throw new TypeError('Cannot fetch models: model type is invalid');
         }
-        else if (typeof selector !== 'object' || selector === null) {
+        else if (!selector || (typeof selector !== 'object' && typeof selector !== 'string')) {
             throw new TypeError('Cannot fetch models: selector is invalid');
         }
         else if (forUpdate !== undefined && typeof forUpdate !== 'boolean') {

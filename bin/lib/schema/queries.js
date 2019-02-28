@@ -17,9 +17,12 @@ function buildSelectQueryClass(schema, mask, modelType) {
             this.mutable = mutable || false;
             this.select = selectText;
             this.from = fromText;
-            this.paramValues = [];
             if (selector) {
-                this.where = buildWhereText(schema, selector, this.paramValues);
+                this.values = [];
+                this.where = buildWhereText(schema, selector, this.values);
+                if (this.values.length === 0) {
+                    this.values = undefined;
+                }
             }
         }
         get text() {
@@ -27,9 +30,6 @@ function buildSelectQueryClass(schema, mask, modelType) {
                 throw new errors_1.ModelError(`Invalid SELECT query for ${this.name} model: WHERE condition is undefined`);
             }
             return `SELECT ${this.select} FROM ${this.from} WHERE ${this.where}${this.mutable ? ' FOR UPDATE' : ''};`;
-        }
-        get values() {
-            return (this.paramValues.length > 0) ? this.paramValues : undefined;
         }
     };
 }

@@ -287,11 +287,11 @@ declare module "@nova/pg-dao" {
     }
 
     export interface SelectOneModelQuery<T=any> {
-        new(mutable: boolean, selector?: object): SingleResultQuery<T> & ModelQueryInstance;
+        new(mutable: boolean, selector?: ModelSelector): SingleResultQuery<T> & ModelQueryInstance;
     }
     
     export interface SelectAllModelsQuery<T=any> {
-        new(mutable: boolean, selector?: object): ListResultQuery<T> & ModelQueryInstance;
+        new(mutable: boolean, selector?: ModelSelector): ListResultQuery<T> & ModelQueryInstance;
     }
 
     interface ModelQueryInstance {
@@ -299,7 +299,6 @@ declare module "@nova/pg-dao" {
         readonly select     : string;
         from                : string;
         where?              : string;
-        readonly paramValues: any[];
     }
 
     // ERROR CLASSES

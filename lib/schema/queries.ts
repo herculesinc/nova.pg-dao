@@ -43,7 +43,7 @@ export function buildSelectQueryClass(schema: DbSchema, mask: QueryMask, modelTy
         readonly select     : string;
         from                : string;
         where?              : string;
-        readonly paramValues: any[];
+        values?             : any[];
 
         constructor(mutable: boolean, selector?: ModelSelector) {
             this.name		= this.constructor.name || queryName;
@@ -52,10 +52,13 @@ export function buildSelectQueryClass(schema: DbSchema, mask: QueryMask, modelTy
             this.mutable    = mutable || false;
             this.select     = selectText;
             this.from       = fromText;
-            this.paramValues= [];
 
             if (selector) {
-                this.where  = buildWhereText(schema, selector, this.paramValues);
+                this.values = [];
+                this.where  = buildWhereText(schema, selector, this.values);
+                if (this.values.length === 0) {
+                    this.values = undefined;
+                }
             }
         }
 
@@ -64,10 +67,6 @@ export function buildSelectQueryClass(schema: DbSchema, mask: QueryMask, modelTy
                 throw new ModelError(`Invalid SELECT query for ${this.name} model: WHERE condition is undefined`);
             }
             return `SELECT ${this.select} FROM ${this.from} WHERE ${this.where}${ this.mutable ? ' FOR UPDATE' : ''};`;
-        }
-
-        get values(): any[] | undefined {
-            return (this.paramValues.length > 0) ? this.paramValues : undefined;
         }
     };
 }
