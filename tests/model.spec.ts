@@ -7,10 +7,11 @@ import { symCreated, symDeleted, symMutable } from '../lib/Model';
 
 const table = 'test_table';
 const idGenerator = new PgIdGenerator(`${table}_seq`);
+const parser = (value: string): any => value;
 
 let schema: any;
 
-describe.only('NOVA.PG-DAO -> Model;', () => {
+describe('NOVA.PG-DAO -> Model;', () => {
     describe('Creating of model', () => {
         it('should create new model without errors', () => {
             expect(() => {
@@ -176,8 +177,8 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
         let TModel: any;
 
         const selectTests = [
-            {mutable: true,  selector: {id: 1}},
-            {mutable: false, selector: {id: 1}}
+            {mutable: true,  selector: {id: '1'}},
+            {mutable: false, selector: {id: '1'}}
         ];
 
         beforeEach(() => {
@@ -304,7 +305,7 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
 
             TModel = TestModel;
 
-            instanceData = {id: 1, createdOn: Date.now(), updatedOn: Date.now(), num: 123, obj: {a: '345'}};
+            instanceData = {id: '1', createdOn: Date.now(), updatedOn: Date.now(), num: 123, obj: {a: '345'}};
         });
 
         describe('with object seed', () => {
@@ -399,11 +400,7 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
                 data = keys.map(key => (instanceData as any)[key]);
 
                 fields = keys.map((key: string, index: number) => {
-                    return {
-                        name  : key,
-                        oid   : index,
-                        parser: (value: string): any => value
-                    };
+                    return {name: key, oid: index, parser: parser};
                 });
             });
 
@@ -424,6 +421,116 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
                 expect(instance[symCreated]).to.to.be.false;
                 expect(instance[symDeleted]).to.to.be.false;
             });
+        });
+    });
+
+    describe('Model.infuse() method', () => {
+        let instanceData: any;
+        let instance: any;
+        let rowData: any;
+        let fields: any;
+
+        beforeEach(() => {
+            @dbModel(table, idGenerator)
+            class TestModel extends Model {
+                @dbField(Number)
+                num!: number;
+
+                @dbField(Object, {readonly: true})
+                str!: string;
+            }
+
+            instanceData = {id: '1', createdOn: Date.now(), updatedOn: Date.now(), num: 123, str: 'str'};
+            instance = new TestModel(instanceData);
+
+            rowData = ['2', 123456, 789021, 345, '123'];
+
+            fields = [
+                {name: 'id',        oid: 1, parser: parser},
+                {name: 'createdOn', oid: 2, parser: parser},
+                {name: 'updatedOn', oid: 3, parser: parser},
+                {name: 'num',       oid: 4, parser: parser},
+                {name: 'str',       oid: 5, parser: parser}
+            ];
+        });
+
+        it('should infuse model without errors', () => {
+            expect(() => {
+                instance.infuse(rowData, fields);
+            }).to.not.throw();
+        });
+
+        it('should update all fields except readonly ones', () => {
+            instance.infuse(rowData, fields);
+
+            rowData.forEach((value: any, index: number) => {
+                const key = fields[index].name;
+
+                expect(instance[key]).to.equal(value);
+            });
+        });
+    });
+
+    describe('Model.applyChanges() method', () => {
+        let instanceData: any, rowData: any, fields: any;
+        let instance1: any;
+        let instance2: any;
+
+        beforeEach(() => {
+            @dbModel(table, idGenerator)
+            class TestModel extends Model {
+                @dbField(Number)
+                num!: number;
+
+                @dbField(Object, {readonly: true})
+                str!: string;
+            }
+
+            instanceData = {id: '1', createdOn: Date.now(), updatedOn: Date.now(), num: 123, str: 'str'};
+            instance1 = new TestModel(instanceData);
+
+            rowData = ['2', 123456, 789021, 345, '123'];
+
+            fields = [
+                {name: 'id',        oid: 1, parser: parser},
+                {name: 'createdOn', oid: 2, parser: parser},
+                {name: 'updatedOn', oid: 3, parser: parser},
+                {name: 'num',       oid: 4, parser: parser},
+                {name: 'str',       oid: 5, parser: parser}
+            ];
+
+            instance2 = new TestModel(rowData, fields);
+        });
+
+        it('should apply changes for model without errors', () => {
+            expect(() => {
+                instance1.applyChanges();
+                instance2.applyChanges();
+            }).to.not.throw();
+        });
+
+        it('should update model for not readonly field', () => { //todo
+            expect(instance1.isModified).to.be.false;
+
+            instance1.num = 12;
+
+            expect(instance1.isModified).to.be.true;
+
+            instance1.applyChanges();
+
+            expect(instance1.isModified).to.be.false;
+        });
+
+        it('should update model for not readonly field', () => {
+            expect(instance2.isModified).to.be.false;
+
+            instance2.num = 12;
+
+            expect(instance2.isModified).to.be.true;
+
+            instance2.applyChanges();
+
+            expect(instance2.isModified).to.be.false;
         });
     });
 
@@ -656,19 +763,21 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
                     const invalidSeedErrorText = 'Model seed is invalid';
 
                     [
-                        {seed: undefined,                                ErrorType: TypeError,  error: 'Model seed is undefined'},
-                        {seed: null,                                     ErrorType: TypeError,  error: invalidSeedErrorText},
-                        {seed: '',                                       ErrorType: TypeError,  error: invalidSeedErrorText},
-                        {seed: 1234,                                     ErrorType: TypeError,  error: invalidSeedErrorText},
+                        {seed: undefined,                                  ErrorType: TypeError,  error: 'Model seed is undefined'},
+                        {seed: null,                                       ErrorType: TypeError,  error: invalidSeedErrorText},
+                        {seed: '',                                         ErrorType: TypeError,  error: invalidSeedErrorText},
+                        {seed: 1234,                                       ErrorType: TypeError,  error: invalidSeedErrorText},
 
-                        {seed: {},                                       ErrorType: ModelError, error: 'Model ID is undefined'},
-                        {seed: {id: null},                               ErrorType: ModelError, error: 'Model ID is null'},
+                        {seed: {},                                         ErrorType: ModelError, error: 'Model ID is undefined'},
+                        {seed: {id: null},                                 ErrorType: ModelError, error: 'Model ID is null'},
+                        {seed: {id: 0},                                    ErrorType: ModelError, error: 'Model ID is invalid'},
+                        {seed: {id: 1},                                    ErrorType: ModelError, error: 'Model ID is invalid'},
 
-                        {seed: {id: 1},                                  ErrorType: ModelError, error: 'Model createdOn is undefined'},
-                        {seed: {id: 1, createdOn: null},                 ErrorType: ModelError, error: 'Model createdOn is null'},
+                        {seed: {id: '1'},                                  ErrorType: ModelError, error: 'Model createdOn is undefined'},
+                        {seed: {id: '1', createdOn: null},                 ErrorType: ModelError, error: 'Model createdOn is null'},
 
-                        {seed: {id: 1, createdOn: 123},                  ErrorType: ModelError, error: 'Model updatedOn is undefined'},
-                        {seed: {id: 1, createdOn: 123, updatedOn: null}, ErrorType: ModelError, error: 'Model updatedOn is null'},
+                        {seed: {id: '1', createdOn: 123},                  ErrorType: ModelError, error: 'Model updatedOn is undefined'},
+                        {seed: {id: '1', createdOn: 123, updatedOn: null}, ErrorType: ModelError, error: 'Model updatedOn is null'},
 
                     ].forEach((test: any) => {
                         const {seed, error, ErrorType} = test;
@@ -689,7 +798,7 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
                     ].forEach((cloneFlag: any) => {
                         it(`should throw an error for cloneFlag=${JSON.stringify(cloneFlag)}`, () => {
                             expect(() => {
-                                new TModel({id: 1, createdOn: 1, updatedOn: 1, num: 3}, cloneFlag);
+                                new TModel({id: '1', createdOn: 1, updatedOn: 1, num: 3}, cloneFlag);
                             }).to.throw(TypeError, 'Clone flag is invalid');
                         });
                     });
@@ -705,9 +814,7 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
                         {fields: '',        error: invalidFieldsErrorText},
                         {fields: true,      error: invalidFieldsErrorText},
                         {fields: {},        error: invalidFieldsErrorText},
-                        {fields: [],        error: invalidFieldsErrorText},
-                        {fields: ['test'],  error: invalidFieldsErrorText},
-                        {fields: [{}],      error: invalidFieldsErrorText},
+                        {fields: [],        error: invalidFieldsErrorText}
                     ].forEach((test: any) => {
                         const {fields, error} = test;
 
@@ -718,6 +825,44 @@ describe.only('NOVA.PG-DAO -> Model;', () => {
                         });
                     });
                 });
+            });
+        });
+
+        describe('Model.applyChanges() method', () => {
+            let instanceData: any, rowData: any, fields: any;
+            let instance1: any;
+            let instance2: any;
+
+            beforeEach(() => {
+                @dbModel(table, idGenerator)
+                class TestModel extends Model {
+                    @dbField(Object, {readonly: true})
+                    str!: string;
+                }
+
+                instanceData = {id: '1', createdOn: Date.now(), updatedOn: Date.now(), str: 'str'};
+                instance1 = new TestModel(instanceData);
+
+                rowData = ['2', 123456, 789021, '123'];
+
+                fields = [
+                    {name: 'id',        oid: 1, parser: parser},
+                    {name: 'createdOn', oid: 2, parser: parser},
+                    {name: 'updatedOn', oid: 3, parser: parser},
+                    {name: 'str',       oid: 4, parser: parser}
+                ];
+
+                instance2 = new TestModel(rowData, fields);
+            });
+
+            it('should return error for readonly field', () => {
+                instance1.str = '1234';
+                expect(() => instance1.applyChanges()).to.throw(Error, 'error text');
+            });
+
+            it('should return error for readonly field', () => {
+                instance2.str = '1234';
+                expect(() => instance2.applyChanges()).to.throw(Error, 'error text');
             });
         });
     });
