@@ -1,7 +1,7 @@
 // IMPORTS
 // ================================================================================================
 import { Dao } from '@nova/core';
-import { Model, Query, SingleResultQuery, ListResultQuery, SessionOptions, Logger, TraceSource } from '@nova/pg-dao';
+import { Model, ModelSelector, Query, SingleResultQuery, ListResultQuery, SessionOptions, Logger, TraceSource } from '@nova/pg-dao';
 import { Client } from 'pg';
 import { Command } from './Command';
 import { Store } from './Store';
@@ -77,7 +77,7 @@ export class DaoSession implements Dao {
         return this.store.getAll(type as any);
     }
 
-    async fetchOne<T extends typeof Model>(type: T, selector: object, forUpdate?: boolean): Promise<InstanceType<T> | undefined> {
+    async fetchOne<T extends typeof Model>(type: T, selector: ModelSelector, forUpdate?: boolean): Promise<InstanceType<T> | undefined> {
         if (!isModelClass(type)) {
             throw new TypeError('Cannot fetch model: model type is invalid');
         }
@@ -96,7 +96,7 @@ export class DaoSession implements Dao {
         return this.execute(query);
     }
 
-    async fetchAll<T extends typeof Model>(type: T, selector: object, forUpdate?: boolean): Promise<InstanceType<T>[]> {
+    async fetchAll<T extends typeof Model>(type: T, selector: ModelSelector, forUpdate?: boolean): Promise<InstanceType<T>[]> {
         if (!isModelClass(type)) {
             throw new TypeError('Cannot fetch models: model type is invalid');
         }

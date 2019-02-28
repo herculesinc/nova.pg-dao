@@ -100,8 +100,31 @@ function buildSelectText(schema) {
     return fieldGetters.join(', ');
 }
 function buildWhereText(schema, selector, values) {
+    let where;
+    if (typeof selector === 'string') {
+        where = selector;
+    }
+    else if (typeof selector === 'object') {
+        if (Array.isArray(selector)) {
+            const filters = [];
+            for (let i = 0; i < selector.length; i++) {
+                filters.push('(' + buildFilter(schema, selector[i], values) + ')');
+            }
+            where = filters.join(' OR ');
+        }
+        else {
+            where = buildFilter(schema, selector, values);
+        }
+    }
+    else {
+        throw new TypeError('Cannot build a fetch query: model selector is invalid');
+    }
+    return where;
+}
+function buildFilter(schema, selector, values) {
+    if (!selector)
+        throw new TypeError('Cannot build a fetch query: model selector is invalid');
     const criteria = [];
-    // TODO: validate that selector is an object
     for (let filter in selector) {
         let field = schema.getField(filter);
         if (!field) {

@@ -56,6 +56,8 @@ declare module "@nova/pg-dao" {
 
     // DAO
     // --------------------------------------------------------------------------------------------
+    export type ModelSelector = string | object | object[];
+
     export interface DaoSession {
 
         readonly inTransaction  : boolean;
@@ -69,8 +71,8 @@ declare module "@nova/pg-dao" {
         getOne<T extends typeof Model>(type: T, id: string): InstanceType<T> | undefined;
         getAll<T extends typeof Model>(type: T): ReadonlyMap<string, InstanceType<T>>;
 
-        fetchOne<T extends typeof Model>(type: T, selector: object, forUpdate?: boolean): Promise<InstanceType<T> | undefined>;
-        fetchAll<T extends typeof Model>(type: T, selector: object, forUpdate?: boolean): Promise<InstanceType<T>[]>;
+        fetchOne<T extends typeof Model>(type: T, selector: ModelSelector, forUpdate?: boolean): Promise<InstanceType<T> | undefined>;
+        fetchAll<T extends typeof Model>(type: T, selector: ModelSelector, forUpdate?: boolean): Promise<InstanceType<T>[]>;
 
         load<T extends typeof Model>(type: T, seed: object): InstanceType<T>;
         create<T extends typeof Model>(type: T, seed: object): Promise<InstanceType<T>>;

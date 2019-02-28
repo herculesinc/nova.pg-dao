@@ -1,6 +1,6 @@
 // IMPORTS
 // ================================================================================================
-import { Model, QueryMask, ResultQuery } from '@nova/pg-dao';
+import { Model, ModelSelector, QueryMask, ResultQuery } from '@nova/pg-dao';
 import { Query, stringifySingleParam, stringifyArrayParam } from '../Query';
 import { ModelError, QueryError } from '../errors';
 import { DbSchema } from './DbSchema';
@@ -9,7 +9,7 @@ import { DbField } from './DbField';
 // INTERFACES
 // ================================================================================================
 export interface SelectModelQuery<T=any> {
-    new(mutable: boolean, selector?: object): ResultQuery<T>;
+    new(mutable: boolean, selector?: ModelSelector): ResultQuery<T>;
 }
 
 export interface InsertModelQuery {
@@ -44,7 +44,7 @@ export function buildSelectQueryClass(schema: DbSchema, mask: QueryMask, modelTy
         where?              : string;
         readonly paramValues: any[];
 
-        constructor(mutable: boolean, selector?: object) {
+        constructor(mutable: boolean, selector?: ModelSelector) {
             this.name		= this.constructor.name || queryName;
             this.mask       = mask;
             this.handler    = modelType;
@@ -152,11 +152,36 @@ function buildSelectText(schema: DbSchema): string {
     return fieldGetters.join(', ');
 }
 
-function buildWhereText(schema: DbSchema, selector: any, values: any[]): string {
+function buildWhereText(schema: DbSchema, selector: ModelSelector, values: any[]): string {
     
-    const criteria: string[] = [];
+    let where: string;
 
-    // TODO: validate that selector is an object
+    if (typeof selector === 'string') {
+        where = selector;
+    }
+    else if (typeof selector === 'object') {
+        if (Array.isArray(selector)) {
+            const filters: string[] = [];
+            for (let i = 0; i < selector.length; i++) {
+                filters.push('(' + buildFilter(schema, selector[i], values) + ')');
+            }
+            where = filters.join(' OR ');
+        }
+        else {
+            where = buildFilter(schema, selector, values);
+        }
+    }
+    else {
+        throw new TypeError('Cannot build a fetch query: model selector is invalid');
+    }
+
+    return where;
+}
+
+function buildFilter(schema: DbSchema, selector: any, values: any[]): string {
+    if (!selector) throw new TypeError('Cannot build a fetch query: model selector is invalid');
+
+    const criteria: string[] = [];
     for (let filter in selector) {
         let field = schema.getField(filter);
         if (!field) {
@@ -172,6 +197,5 @@ function buildWhereText(schema: DbSchema, selector: any, values: any[]): string 
             criteria.push(`${field.snakeName}=${stringifySingleParam(paramValue, values)}`);
         }
     }
-
     return criteria.join(' AND ');
 }
