@@ -58,7 +58,9 @@ export class Store {
                 if (model.isMutable) {
                     if (model.isDeleted) throw new ModelError(`Cannot reload ${modelClass.name} model: model has been deleted`);
                     if (model.isCreated) throw new ModelError(`Cannot reload ${modelClass.name} model: model is newly inserted`);
-                    if (model.isModified) throw new ModelError(`Cannot reload ${modelClass.name} model: model has been modified`);
+                    if (model.hasChanged(this.checkImmutable))  {
+                        throw new ModelError(`Cannot reload ${modelClass.name} model: model has been modified`);
+                    }
                 }
                 model.infuse(rowData, fields);
             }
@@ -119,7 +121,7 @@ export class Store {
             // iterate through models and check every model for changes
             for (let models of this.cache.values()) {
                 for (let model of models.values()) {
-                    const mQueries = model.getSyncQueries();
+                    const mQueries = model.getSyncQueries(true);
                     if (mQueries.length === 1) {
                         queries.push(mQueries[0]);
                     }
@@ -134,7 +136,7 @@ export class Store {
             for (let models of this.cache.values()) {
                 for (let model of models.values()) {
                     if (!model.isMutable) continue;
-                    const mQueries = model.getSyncQueries();
+                    const mQueries = model.getSyncQueries(false);
                     if (mQueries.length > 0) {
                         if (mQueries.length === 1) {
                             queries.push(mQueries[0]);

@@ -115,11 +115,13 @@ class Model {
     get isDeleted() {
         return this[exports.symDeleted];
     }
-    get isModified() {
+    hasChanged(checkReadonlyFields) {
         const schema = this.constructor.getSchema();
         const original = this[symOriginal];
+        if (!original)
+            return false; // TODO: check if tracked?
         for (let field of schema.fields) {
-            if (field.readonly)
+            if (!checkReadonlyFields && field.readonly)
                 continue;
             let fieldName = field.name;
             if (field.areEqual) {
@@ -154,7 +156,7 @@ class Model {
         }
         this[symOriginal] = original;
     }
-    getSyncQueries() {
+    getSyncQueries(checkReadonlyFields) {
         const queries = [];
         if (this[exports.symCreated]) {
             queries.push(this.buildInsertQuery());
@@ -171,7 +173,7 @@ class Model {
             const schema = this.constructor.getSchema();
             const changes = [];
             for (let field of schema.fields) {
-                if (field.readonly)
+                if (!checkReadonlyFields && field.readonly)
                     continue;
                 let fieldName = field.name;
                 if (field.areEqual) {

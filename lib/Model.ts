@@ -144,12 +144,13 @@ export class Model implements IModel {
         return this[symDeleted];
     }
 
-    get isModified(): boolean {
+    hasChanged(checkReadonlyFields: boolean): boolean {
         const schema = (this.constructor as typeof Model).getSchema();
         const original = this[symOriginal];
+        if (!original) return false; // TODO: check if tracked?
 
         for (let field of schema.fields) {
-            if (field.readonly) continue;
+            if (!checkReadonlyFields && field.readonly) continue;
 
             let fieldName = field.name as keyof this;
             if (field.areEqual) {
@@ -184,7 +185,7 @@ export class Model implements IModel {
         this[symOriginal] = original;
     }
 
-    getSyncQueries(): Query[] {
+    getSyncQueries(checkReadonlyFields: boolean): Query[] {
         const queries: Query[] = [];
 
         if (this[symCreated]) {
@@ -202,7 +203,7 @@ export class Model implements IModel {
             const schema = (this.constructor as typeof Model).getSchema();
             const changes: DbField[] = [];
             for (let field of schema.fields) {
-                if (field.readonly) continue;
+                if (!checkReadonlyFields && field.readonly) continue;
 
                 let fieldName = field.name as keyof this;
                 if (field.areEqual) {

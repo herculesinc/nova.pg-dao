@@ -272,12 +272,12 @@ declare module "@nova/pg-dao" {
         readonly updatedOn  : number;
 
         infuse(rowData: string[], fields: FieldDescriptor[]): void;
-        getSyncQueries(): Query[];
+        hasChanged(checkReadonlyFields: boolean): boolean;
+        getSyncQueries(checkReadonlyFields: boolean): Query[];
 
         isMutable: boolean;
         isCreated: boolean;
         isDeleted: boolean;
-        isModified: boolean;
 
         static SelectQuery<T extends typeof Model>(this: T, mask: 'list'): SelectAllModelsQuery<InstanceType<T>>;
         static SelectQuery<T extends typeof Model>(this: T, mask: 'single'): SelectOneModelQuery<InstanceType<T>>;
