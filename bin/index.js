@@ -13,6 +13,7 @@ exports.dbModel = schema_1.dbModel;
 exports.dbField = schema_1.dbField;
 exports.PgIdGenerator = schema_1.PgIdGenerator;
 exports.GuidGenerator = schema_1.GuidGenerator;
+exports.Operators = schema_1.Operators;
 exports.Timestamp = schema_1.Timestamp;
 var errors_1 = require("./lib/errors");
 exports.ConnectionError = errors_1.ConnectionError;

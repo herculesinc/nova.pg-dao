@@ -4,6 +4,7 @@ export { Timestamp } from './types';
 export { SelectModelQuery, InsertModelQuery, UpdateModelQuery, DeleteModelQuery } from './queries';
 export { dbModel, dbField } from './decorators';
 export { PgIdGenerator, GuidGenerator } from './idGenerators';
+export { Operators } from './operators';
 
 import { buildSelectQueryClass, buildInsertQueryClass, buildUpdateQueryClass, buildDeleteQueryClass } from './queries';
 export const queries = {

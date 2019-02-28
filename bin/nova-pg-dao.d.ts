@@ -56,8 +56,6 @@ declare module "@nova/pg-dao" {
 
     // DAO
     // --------------------------------------------------------------------------------------------
-    export type ModelSelector = string | object | object[];
-
     export interface DaoSession {
 
         readonly inTransaction  : boolean;
@@ -81,6 +79,24 @@ declare module "@nova/pg-dao" {
         flush(): Promise<void>;
         close(action: 'commit' | 'rollback'): Promise<void>;
     }
+
+    export type ModelSelector = string | object | object[];
+    export interface Condition {
+        operator: symbol;
+        operands: any[];
+    }
+
+    export const Operators: {
+        eq(value: any)      : Condition;
+        ne(value: any)      : Condition;
+        gt(value: any)      : Condition;
+        gte(value: any)     : Condition;
+        lt(value: any)      : Condition;
+        lte(value: any)     : Condition;
+        not(value: any)     : Condition;
+        like(value: any)    : Condition;
+        contains(value: any): Condition;
+    };
 
     // RESULT HANDLER
     // --------------------------------------------------------------------------------------------

@@ -3,8 +3,7 @@
 import { Database, Query } from '../index';
 import { ListResultQueryOptions, SingleResultQueryOptions, ResultHandler, FieldHandler } from '@nova/pg-dao';
 import { Model } from '../lib/Model';
-import { dbModel, dbField } from '../lib/schema/decorators';
-import { PgIdGenerator, GuidGenerator } from '../lib/schema/idGenerators';
+import { dbModel, dbField, PgIdGenerator, GuidGenerator, Operators as Op } from '../lib/schema';
 
 // MODULE VARIABLES
 // ================================================================================================
@@ -102,11 +101,20 @@ class Token extends Model {
 (function modelTests() {
 
     console.log(JSON.stringify(Token.getSchema()));
-    const qSelectAccounts = Token.SelectQuery('list');
-    console.log(new qSelectAccounts(false, { id: '123' }).text);
-    console.log(new qSelectAccounts(true,  { id: '234' }).text);
+    const qSelectTokens = Token.SelectQuery('list');
+    console.log(new qSelectTokens(false, { id: '123' }).text);
+    console.log(new qSelectTokens(true,  { id: '234' }).text);
+    console.log(new qSelectTokens(false, [
+        { 
+            origin: Op.contains({ method: 'facebook'}), 
+            status: Op.not(null) 
+        }, 
+        { 
+            status: Op.lte(5) 
+        }
+    ]).text);
 
-});
+})();
 
 // DATABASE TESTS
 // ================================================================================================
@@ -150,4 +158,4 @@ const database = new Database({
 
     const guidGenerator = new GuidGenerator();
     console.log(await guidGenerator.getNextId());
-})();
+});

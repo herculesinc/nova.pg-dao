@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const Query_1 = require("../Query");
 const errors_1 = require("../errors");
+const operators_1 = require("./operators");
 // SELECT QUERY
 // ================================================================================================
 function buildSelectQueryClass(schema, mask, modelType) {
@@ -125,18 +126,21 @@ function buildFilter(schema, selector, values) {
     if (!selector)
         throw new TypeError('Cannot build a fetch query: model selector is invalid');
     const criteria = [];
-    for (let filter in selector) {
-        let field = schema.getField(filter);
+    for (let fieldName in selector) {
+        let field = schema.getField(fieldName);
         if (!field) {
-            throw new errors_1.QueryError('Cannot build a fetch query: model selector and schema are incompatible'); // TODO: model error?
+            throw new errors_1.ModelError('Cannot build fetch query: model selector and schema are incompatible');
         }
         // TODO: check for custom serialization?
-        let paramValue = selector[filter];
-        if (paramValue && Array.isArray(paramValue)) {
-            criteria.push(`${field.snakeName} IN (${Query_1.stringifyArrayParam(paramValue, values)})`);
+        let paramValue = selector[fieldName];
+        if (Array.isArray(paramValue)) {
+            criteria.push(`${schema.table}.${field.snakeName} IN (${Query_1.stringifyArrayParam(paramValue, values)})`);
+        }
+        else if (operators_1.Condition.isCondition(paramValue)) {
+            criteria.push(operators_1.Condition.stringify(paramValue, schema.table, field, values));
         }
         else {
-            criteria.push(`${field.snakeName}=${Query_1.stringifySingleParam(paramValue, values)}`);
+            criteria.push(`${schema.table}.${field.snakeName}=${Query_1.stringifySingleParam(paramValue, values)}`);
         }
     }
     return criteria.join(' AND ');

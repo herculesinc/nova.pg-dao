@@ -2,9 +2,10 @@
 // ================================================================================================
 import { Model, ModelSelector, QueryMask, ResultQuery } from '@nova/pg-dao';
 import { Query, stringifySingleParam, stringifyArrayParam } from '../Query';
-import { ModelError, QueryError } from '../errors';
+import { ModelError } from '../errors';
 import { DbSchema } from './DbSchema';
 import { DbField } from './DbField';
+import { Condition } from './operators';
 
 // INTERFACES
 // ================================================================================================
@@ -182,19 +183,22 @@ function buildFilter(schema: DbSchema, selector: any, values: any[]): string {
     if (!selector) throw new TypeError('Cannot build a fetch query: model selector is invalid');
 
     const criteria: string[] = [];
-    for (let filter in selector) {
-        let field = schema.getField(filter);
+    for (let fieldName in selector) {
+        let field = schema.getField(fieldName);
         if (!field) {
-            throw new QueryError('Cannot build a fetch query: model selector and schema are incompatible'); // TODO: model error?
+            throw new ModelError('Cannot build fetch query: model selector and schema are incompatible');
         }
 
         // TODO: check for custom serialization?
-        let paramValue = selector[filter];
-        if (paramValue && Array.isArray(paramValue)) {
-            criteria.push(`${field.snakeName} IN (${stringifyArrayParam(paramValue, values)})`);
+        let paramValue = selector[fieldName];
+        if (Array.isArray(paramValue)) {
+            criteria.push(`${schema.table}.${field.snakeName} IN (${stringifyArrayParam(paramValue, values)})`);
+        }
+        else if (Condition.isCondition(paramValue)) {
+            criteria.push(Condition.stringify(paramValue, schema.table, field, values));
         }
         else {
-            criteria.push(`${field.snakeName}=${stringifySingleParam(paramValue, values)}`);
+            criteria.push(`${schema.table}.${field.snakeName}=${stringifySingleParam(paramValue, values)}`);
         }
     }
     return criteria.join(' AND ');

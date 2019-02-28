@@ -12,6 +12,8 @@ exports.dbField = decorators_1.dbField;
 var idGenerators_1 = require("./idGenerators");
 exports.PgIdGenerator = idGenerators_1.PgIdGenerator;
 exports.GuidGenerator = idGenerators_1.GuidGenerator;
+var operators_1 = require("./operators");
+exports.Operators = operators_1.Operators;
 const queries_1 = require("./queries");
 exports.queries = {
     buildSelectQueryClass: queries_1.buildSelectQueryClass,
