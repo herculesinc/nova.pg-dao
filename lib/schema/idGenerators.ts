@@ -1,6 +1,7 @@
 // IMPORTS
 // ================================================================================================
 import { IdGenerator, SingleResultQuery, DaoSession, Logger } from '@nova/pg-dao';
+import * as uuid from 'uuid/v4';
 
 // POSTGRES ID GENERATOR
 // ================================================================================================
@@ -26,7 +27,7 @@ export class PgIdGenerator implements IdGenerator {
 // ================================================================================================
 export class GuidGenerator implements IdGenerator {
     async getNextId(): Promise<string> {
-        return ''; // TODO: generate a new guid
+        return uuid();
     }
 }
 

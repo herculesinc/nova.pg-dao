@@ -147,6 +147,10 @@ export class DaoSession implements Dao {
     }
 
     delete<T extends Model>(model: T): T {
+        if (!this.isActive) {
+            throw new ConnectionError('Cannot delete model: session has already been closed');
+        }
+        else 
         if (this.isReadOnly) {
             throw new ConnectionError('Cannot delete model: session is read-only');
         }

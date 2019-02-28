@@ -103,7 +103,10 @@ class DaoSession {
         return model;
     }
     delete(model) {
-        if (this.isReadOnly) {
+        if (!this.isActive) {
+            throw new errors_1.ConnectionError('Cannot delete model: session has already been closed');
+        }
+        else if (this.isReadOnly) {
             throw new errors_1.ConnectionError('Cannot delete model: session is read-only');
         }
         this.store.delete(model);

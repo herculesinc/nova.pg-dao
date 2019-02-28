@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const uuid = require("uuid/v4");
 // POSTGRES ID GENERATOR
 // ================================================================================================
 class PgIdGenerator {
@@ -20,7 +21,7 @@ exports.PgIdGenerator = PgIdGenerator;
 // ================================================================================================
 class GuidGenerator {
     async getNextId() {
-        return ''; // TODO: generate a new guid
+        return uuid();
     }
 }
 exports.GuidGenerator = GuidGenerator;

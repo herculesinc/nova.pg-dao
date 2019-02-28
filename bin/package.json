@@ -27,7 +27,8 @@
   },
   "dependencies": {
     "@nova/core": "0.3.x",
-    "pg": "7.8.x"
+    "pg": "7.8.x",
+    "uuid": "3.3.x"
   },
   "devDependencies": {
     "@types/chai": "4.1.x",

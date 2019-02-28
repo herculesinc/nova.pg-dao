@@ -4,7 +4,7 @@ import { Database, Query } from '../index';
 import { ListResultQueryOptions, SingleResultQueryOptions, ResultHandler, FieldHandler } from '@nova/pg-dao';
 import { Model } from '../lib/Model';
 import { dbModel, dbField } from '../lib/schema/decorators';
-import { PgIdGenerator } from '../lib/schema/idGenerators';
+import { PgIdGenerator, GuidGenerator } from '../lib/schema/idGenerators';
 
 // MODULE VARIABLES
 // ================================================================================================
@@ -147,4 +147,7 @@ const database = new Database({
     catch (error) {
         console.error(error);
     }
+
+    const guidGenerator = new GuidGenerator();
+    console.log(await guidGenerator.getNextId());
 })();
