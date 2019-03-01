@@ -241,7 +241,7 @@ export class Model implements IModel {
     saveOriginal(keepReadonlyFields: boolean) {
         const schema = (this.constructor as typeof Model).getSchema();
         const original: any = {};
-        
+
         for (let field of schema.fields) {
             if (!keepReadonlyFields && field.readonly) continue;
             let fieldName = field.name as keyof this;

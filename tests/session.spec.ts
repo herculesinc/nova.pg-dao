@@ -382,7 +382,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
         });
     });
 
-    describe('fetch/get/create/delete methods tests;', () => {
+    describe('fetch/get/create/delete/load methods tests;', () => {
         let UserModel: any;
 
         const table = 'tmp_users';
@@ -602,7 +602,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('should be called without an error', async () => {
-                session.create(UserModel, {username: 'username', tags: [1,2]});
+                await session.create(UserModel, {username: 'username', tags: [1,2]});
             });
 
             it('should return new model with correct fields', async () => {
@@ -624,12 +624,157 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 await session.close('commit');
 
                 session = db.getSession(options, logger);
+
                 const fetchedUser = await session.fetchOne(UserModel, { id: user.id });
+                const fetchedUsers = await session.fetchAll(UserModel, 'id is not null');
 
                 expect(fetchedUser).to.not.be.undefined;
                 expect(fetchedUser.id).to.equal(user.id);
                 expect(fetchedUser.username).to.equal(user.username);
                 expect(fetchedUser.tags).to.deep.equal(user.tags);
+
+                expect(fetchedUsers).have.length(5);
+            });
+        });
+
+        describe('delete() method', () => {
+            let user: any;
+
+            beforeEach(async () => {
+                session = db.getSession(options, logger);
+                user = await await session.fetchOne(UserModel, {id: '1'}, true);
+            });
+
+            it('should be called without an error', async () => {
+                session.delete(user);
+            });
+
+            it('should return new model with correct fields', async () => {
+                const dUser = session.delete(user);
+
+                expect(dUser).to.not.be.undefined;
+                expect(dUser.id).to.equal('1');
+
+                expect(dUser.isMutable()).to.be.true;
+                expect(dUser.isCreated()).to.be.false;
+                expect(dUser.isDeleted()).to.be.true;
+                expect(dUser.isModified()).to.be.false;
+            });
+
+            it('should delete record from db', async () => {
+                session.delete(user);
+                await session.close('commit');
+
+                session = db.getSession(options, logger);
+
+                const fetchedUser = await session.fetchOne(UserModel, { id: user.id });
+                const fetchedUsers = await session.fetchAll(UserModel, 'id is not null');
+
+                expect(fetchedUser).to.be.undefined;
+                expect(fetchedUsers).to.have.length(3);
+            });
+        });
+
+        describe('load() method', () => {
+            const seed = {id: '6', username: 'test', createdOn: Date.now(), updatedOn: Date.now(), tags: [1,2]};
+
+            beforeEach(() => {
+                session = db.getSession(options, logger);
+            });
+
+            it('should be called without an error', () => {
+                session.load(UserModel, seed);
+            });
+
+            it('should return all users for read-only session', () => {
+                const user = session.load(UserModel, seed);
+
+                expect(user).to.not.be.undefined;
+                expect(user.id).to.equal(seed.id);
+
+                expect(user.isMutable()).to.be.false;
+                expect(user.isCreated()).to.be.false;
+                expect(user.isDeleted()).to.be.false;
+                expect(user.isModified()).to.be.false;
+            });
+
+            it('should add model to session store', async () => {
+                const user = session.load(UserModel, seed);
+
+                const sUser = session.getOne(UserModel, seed.id);
+
+                expect(sUser).to.not.be.undefined;
+                expect(sUser).to.equal(user);
+            });
+        });
+    });
+
+    describe('flush/close methods tests;', () => {
+        let UserModel: any;
+        let created: any;
+        let updated: any;
+        let deleted: any;
+
+        const table = 'tmp_users';
+        const idGenerator = new PgIdGenerator(`${table}_id_seq`);
+
+        beforeEach(async () => {
+            db = new Database(settings);
+            session = db.getSession(options, logger);
+
+            await prepareDatabase(session);
+            await session.close('commit');
+
+            @dbModel(table, idGenerator)
+            class UModel extends Model {
+                @dbField(String)
+                username!: string;
+
+                @dbField(Array)
+                tags!: string[];
+            }
+
+            UserModel = UModel;
+
+            session = db.getSession(options, logger);
+
+            const dUser = await session.fetchOne(UserModel, {id: '1'}, true);
+
+            created = await session.create(UserModel, {username: 'username', tags: [1,2]});
+            updated = await session.fetchOne(UserModel, {id: '2'}, true);
+            deleted = session.delete(dUser);
+
+            updated.username = 'updated';
+        });
+
+        afterEach(async () => {
+            if (session && session.isActive) {
+                console.log('closing')
+                await session.close('commit');
+                console.log('closed')
+            }
+        });
+
+        describe('flush() method', () => {
+            it('should be called without an error', async () => {
+                await session.flush();
+            });
+
+            it('db should be updated after flush() method', async () => {
+                await session.flush();
+
+                const cUser = await session.fetchOne(UserModel, {id: created.id});
+                const uUser = await session.fetchOne(UserModel, {id: updated.id});
+                const dUser = await session.fetchOne(UserModel, {id: deleted.id});
+
+                expect(cUser).to.not.be.undefined;
+                expect(cUser.id).to.equal(created.id);
+
+                expect(uUser).to.not.be.undefined;
+                expect(uUser.id).to.equal(updated.id);
+                expect(uUser.username).to.equal('updated');
+
+                expect(dUser).to.be.undefined;
             });
         });
     });
@@ -660,14 +805,6 @@ describe('NOVA.PG-DAO -> Session;', () => {
             expect(db.getPoolState().idle).to.equal(0);
 
             expect(session.isActive).to.to.be.true;
-        });
-
-        it('Closing an already closed session should throw an error', async () => {
-            await session.close('commit');
-
-            expect(session.isActive).to.be.false;
-
-            await expect(session.close('commit')).to.eventually.be.rejectedWith(Error, 'Cannot close session: session has already been closed');
         });
 
         it('Executing a query after committing a transaction should throw an error', async () => {
@@ -750,11 +887,6 @@ describe('NOVA.PG-DAO -> Session;', () => {
             const readOnlyOpts = {...options, readonly: true};
 
             beforeEach(async () => {
-
-                if ( session && session.isActive) {
-                    await session.close('commit');
-                }
-
                 session = db.getSession(readOnlyOpts, logger);
 
                 @dbModel('tmp_users', new PgIdGenerator('tmp_users_id_seq'))
@@ -767,6 +899,12 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 }
 
                 UserModel = UModel;
+            });
+
+            afterEach(async () => {
+                if ( session && session.isActive) {
+                    await session.close('commit');
+                }
             });
 
             it('fetchOne() method for update', async () => {
@@ -786,7 +924,97 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
                 expect(() => session.delete(user)).to.throw(Error, 'Cannot delete model: session is read-only');
             });
-            
+        });
+
+        describe('flush/close methods errors', async () => {
+            let UserModel: any;
+
+            const readOnlyOpts = {...options, readonly: true};
+
+            beforeEach(async () => {
+                @dbModel('tmp_users', new PgIdGenerator('tmp_users_id_seq'))
+                class UModel extends Model {
+                    @dbField(String)
+                    username!: string;
+
+                    @dbField(Array)
+                    tags!: string[];
+                }
+
+                UserModel = UModel;
+            });
+
+            afterEach(async () => {
+                if ( session && session.isActive) {
+                    await session.close('commit');
+                }
+            });
+
+            it('Trying to call flush() method in a read-only session should throw errors', async () => {
+                session = db.getSession(readOnlyOpts, logger);
+
+                expect(session.isActive).to.be.true;
+                expect(session.isReadOnly).to.be.true;
+
+                await expect(session.flush()).to.eventually.be.rejectedWith(Error, 'Cannot flush session: session is read-only');
+            });
+
+            it('Trying to call flush() method in closed session should throw errors', async () => {
+                session = db.getSession(options, logger);
+                await session.close('commit');
+
+                expect(session.isActive).to.be.false;
+                expect(session.isReadOnly).to.be.false;
+
+                await expect(session.flush()).to.eventually.be.rejectedWith(Error, 'Cannot flush session: session has already been closed');
+            });
+
+            it('Closing an already closed session should throw an error', async () => {
+                session = db.getSession(options, logger);
+                await session.close('commit');
+
+                expect(session.isActive).to.be.false;
+
+                await expect(session.close('commit')).to.eventually.be.rejectedWith(Error, 'Cannot close session: session has already been closed');
+            });
+
+            it('Closing read-only session with dirty models should throw an error', async () => { // todo
+                session = db.getSession(readOnlyOpts, logger);
+
+                expect(session.isReadOnly).to.be.true;
+
+                session.load(UserModel, {id: '4', username: 'test', createdOn: 1, updatedOn: 2, tags: [1,2]});
+
+                const user = session.getOne(UserModel, '4');
+
+                expect(user).to.not.be.undefined;
+
+                user.username = 'username';
+
+                await expect(session.close('commit')).to.eventually.be.rejectedWith(Error, 'Cannot close session: session has already been closed');
+            });
+
+            describe('Closing session with invalid action should throw an error', () => {
+                beforeEach(async () => {
+                    session = db.getSession(options, logger);
+                });
+
+                afterEach(async () => {
+                    if ( session && session.isActive) {
+                        await session.close('commit');
+                    }
+                });
+
+                [
+                    undefined, null, false, 0, '',
+                    123, 'commmmit', 'rollingback', 'roll back',
+                    ['commit']
+                ].forEach((action: any) => {
+                    it(`for action=${JSON.stringify(action)}`, async () => {
+                        await expect(session.close(action)).to.eventually.be.rejectedWith(Error, `Cannot close session: '${action}' action is invalid`);
+                    });
+                });
+            });
         });
     });
 });
