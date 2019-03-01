@@ -1,4 +1,5 @@
 ﻿import * as chai from 'chai';
+import * as sinon from 'sinon';
 import * as chaiAsPromised from 'chai-as-promised';
 
 chai.use(chaiAsPromised);
@@ -6,7 +7,16 @@ chai.use(chaiAsPromised);
 const expect = chai.expect;
 
 import { Database, Model } from './../index';
-import { SessionOptions, PoolState, QueryHandler } from '@nova/pg-dao';
+import {
+    SessionOptions,
+    PoolState,
+    QueryHandler,
+    FieldHandler,
+    Serializer,
+    Parser,
+    Comparator,
+    Cloner
+} from '@nova/pg-dao';
 import { dbField, dbModel, PgIdGenerator, Query, Operators } from '../index';
 import { DaoSession } from '../lib/Session';
 import { User, prepareDatabase } from './setup';
@@ -774,6 +784,14 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(deleted.isModified()).to.be.false;
             });
 
+            it('updatedOn field for updated model should be changed', async () => {
+                const originUpdateOn = updated.updatedOn;
+
+                await session.flush();
+
+                expect(updated.updatedOn).to.not.equal(originUpdateOn);
+            });
+
             it('db should be updated after flush() method', async () => {
                 await session.flush();
 
@@ -793,6 +811,189 @@ describe('NOVA.PG-DAO -> Session;', () => {
         });
     });
 
+    describe('custom model handlers', () => {
+        let UserModel: any;
+        let parseSpy: any, serializeSpy: any, cloneSpy: any, equalSpy: any;
+        let customHandler: FieldHandler;
+
+        const table = 'tmp_users';
+        const idGenerator = new PgIdGenerator(`${table}_id_seq`);
+
+        const seed = {id: '1', createdOn: Date.now(), updatedOn: Date.now(), username: 'user', tags: ['1', '2']};
+
+        beforeEach(async () => {
+            db = new Database(settings);
+            session = db.getSession(options, logger);
+
+            await prepareDatabase(session);
+
+            customHandler = {
+                parse    : (value: string): string[] => JSON.parse(value).map((v: string): string => v + '_parsed'),
+                serialize: (value: string[]): string => JSON.stringify(value),
+                clone    : (value: string[]): string[] => value.map((v: string): string => v + '_cloned'),
+                areEqual : (value1: string, value2: string): boolean => value1 !== value2
+            };
+
+            parseSpy = sinon.spy(customHandler, 'parse');
+            serializeSpy = sinon.spy(customHandler, 'serialize');
+            cloneSpy = sinon.spy(customHandler, 'clone');
+            equalSpy = sinon.spy(customHandler, 'areEqual');
+
+            @dbModel(table, idGenerator)
+            class UModel extends Model {
+                @dbField(String)
+                username!: string;
+
+                @dbField(Array, {handler: customHandler})
+                tags!: string[];
+            }
+
+            UserModel = UModel;
+        });
+
+        afterEach(async () => {
+            if (session && session.isActive) {
+                await session.close('commit');
+            }
+        });
+
+        describe('creating new model with clone=true', () => {
+            beforeEach(() => {
+                const user = new UserModel(seed, true);
+            });
+
+            it('should not call parse() method', () => {
+                expect(parseSpy.called).to.be.false;
+            });
+
+            it('should call clone() method', () => {
+                expect(cloneSpy.called).to.be.true;
+                expect(cloneSpy.callCount).to.equal(1);
+                expect(cloneSpy.firstCall.calledWithExactly(seed.tags)).to.be.true;
+            });
+
+            it('should not call serialize() method', () => {
+                expect(serializeSpy.called).to.be.false;
+            });
+
+            it('should not call areEqual() method', () => {
+                expect(equalSpy.called).to.be.false;
+            });
+        });
+
+        describe('creating new model with clone=false', () => {
+            beforeEach(() => {
+                const user = new UserModel(seed, false);
+            });
+
+            it('should not call parse() method', () => {
+                expect(parseSpy.called).to.be.false;
+            });
+
+            it('should not call clone() method', () => {
+                expect(cloneSpy.called).to.be.false;
+            });
+
+            it('should not call serialize() method', () => {
+                expect(serializeSpy.called).to.be.false;
+            });
+
+            it('should not call areEqual() method', () => {
+                expect(equalSpy.called).to.be.false;
+            });
+        });
+
+        describe('fetching model from db', () => {
+            let user: any;
+
+            beforeEach(async () => {
+                user = await session.fetchOne(UserModel, {id: '1'});
+            });
+
+            it('should call parse() method', () => {
+                expect(user.tags).to.deep.equal([ 'test_parsed', 'testing_parsed' ]);
+
+                expect(parseSpy.called).to.be.true;
+                expect(parseSpy.callCount).to.equal(1);
+                expect(parseSpy.firstCall.calledWithExactly('["test", "testing"]')).to.be.true;
+            });
+
+            it('should call clone() method', () => {
+                expect(cloneSpy.called).to.be.true;
+                expect(cloneSpy.callCount).to.equal(1);
+                expect(cloneSpy.firstCall.calledWithExactly(user.tags)).to.be.true;
+            });
+
+            it('should not call serialize() method', () => {
+                expect(serializeSpy.called).to.be.false;
+            });
+
+            it('should not call areEqual() method', () => {
+                expect(equalSpy.called).to.be.false;
+            });
+        });
+
+        describe('creating new model and closing session', () => {
+            let user: any;
+
+            beforeEach(async () => {
+                user = await session.create(UserModel, {username: seed.username, tags: seed.tags});
+
+                await session.close('commit');
+            });
+
+            it('should not call parse() method', () => {
+                expect(parseSpy.called).to.be.false;
+            });
+
+            it('should call clone() method', () => {
+                expect(cloneSpy.called).to.be.true;
+                expect(cloneSpy.callCount).to.equal(2);
+                expect(cloneSpy.firstCall.calledWithExactly(seed.tags)).to.be.true;
+                expect(cloneSpy.secondCall.calledWithExactly(user.tags)).to.be.true;
+            });
+
+            it('should call serialize() method', () => {
+                expect(serializeSpy.called).to.be.true;
+                expect(serializeSpy.callCount).to.equal(1);
+                expect(serializeSpy.firstCall.calledWithExactly([ '1_cloned', '2_cloned' ])).to.be.true;
+            });
+
+            it('should not call areEqual() method', () => {
+                expect(equalSpy.called).to.be.false;
+            });
+        });
+
+        describe('fetching new model and closing session', () => {
+            let user: any;
+
+            beforeEach(async () => {
+                user = await session.fetchOne(UserModel, {id: '1'});
+
+                await session.close('commit');
+            });
+
+            it('should call parse() method', () => {
+                expect(parseSpy.called).to.be.true;
+                expect(parseSpy.callCount).to.equal(1);
+            });
+
+            it('should call clone() method', () => {
+                expect(cloneSpy.called).to.be.true;
+                expect(cloneSpy.callCount).to.equal(1);
+            });
+
+            it('should not call serialize() method', () => {
+                expect(serializeSpy.called).to.be.false;
+            });
+
+            it('should not call areEqual() method', () => {
+                expect(equalSpy.called).to.be.true;
+                expect(equalSpy.callCount).to.equal(1);
+            });
+        });
+    });
+
     describe('Error condition tests;', () => {
         beforeEach(async () => {
             db = new Database(settings);
@@ -801,11 +1002,12 @@ describe('NOVA.PG-DAO -> Session;', () => {
             await prepareDatabase(session);
         });
 
-        afterEach(async () => {
-            if ( session && session.isActive) {
-                await session.close('rollback');
-            }
-        });
+        // todo  uncomment after fixing
+        // afterEach(async () => {
+        //     if ( session && session.isActive) {
+        //         await session.close('rollback');
+        //     }
+        // });
 
         it('Query execution error should close the session and release the connection back to the pool', async () => {
             const query: any = {
@@ -1032,6 +1234,144 @@ describe('NOVA.PG-DAO -> Session;', () => {
                     });
                 });
             });
+        });
+
+        describe.only('custom model handlers errors', () => {
+            let customHandler: FieldHandler;
+            let UserModel: any;
+
+            const table = 'tmp_users';
+            const idGenerator = new PgIdGenerator(`${table}_id_seq`);
+            const errorText = 'parse error';
+
+            beforeEach(async () => {
+                await session.close('commit');
+
+                customHandler = {
+                    parse    : (value: string): string[] => JSON.parse(value),
+                    serialize: (value: string[]): string => JSON.stringify(value),
+                    clone    : (value: string[]): string[] => value,
+                    areEqual : (value1: string, value2: string): boolean => value1 !== value2
+                };
+
+                session = db.getSession(options, logger);
+            });
+
+            describe('when parse() handler throw error', () => {
+                beforeEach(() => {
+                    customHandler.parse = (value: string): string[] => {throw new Error(errorText);};
+
+                    @dbModel(table, idGenerator)
+                    class UModel extends Model {
+                        @dbField(String)
+                        username!: string;
+
+                        @dbField(Array, {handler: customHandler})
+                        tags!: string[];
+                    }
+
+                    UserModel = UModel;
+                });
+
+                it('should call parse() method', async () => {
+                    expect(session.isActive).to.be.true;
+
+                    await expect(session.fetchOne(UserModel, {id: '1'})).to.eventually.be.rejectedWith(Error, errorText);
+
+                    expect(session.isActive).to.be.true;
+                });
+            });
+
+            describe('when serialize() handler throw error', () => {
+                beforeEach(() => {
+                    customHandler.serialize = (value: string[]): string => {throw new Error(errorText);};
+
+                    @dbModel(table, idGenerator)
+                    class UModel extends Model {
+                        @dbField(String)
+                        username!: string;
+
+                        @dbField(Array, {handler: customHandler})
+                        tags!: string[];
+                    }
+
+                    UserModel = UModel;
+                });
+
+                it('should call serialize() method', async () => {
+                    expect(session.isActive).to.be.true;
+
+                    await session.create(UserModel, {username: 'username', tags: ['1', '2']});
+
+                    await expect(session.close('commit')).to.eventually.be.rejectedWith(Error, errorText);
+
+                    expect(session.isActive).to.be.true;
+                });
+            });
+
+            describe('when clone() handler throw error', () => {
+                beforeEach(() => {
+                    customHandler.clone = (value: string[]): string[] => {throw new Error(errorText);};
+
+                    @dbModel(table, idGenerator)
+                    class UModel extends Model {
+                        @dbField(String)
+                        username!: string;
+
+                        @dbField(Array, {handler: customHandler})
+                        tags!: string[];
+                    }
+
+                    UserModel = UModel;
+                });
+
+                it('should call close() method', async () => {
+                    expect(session.isActive).to.be.true;
+
+                    await expect(session.fetchOne(UserModel, {id: '1'})).to.eventually.be.rejectedWith(Error, errorText);
+
+                    expect(session.isActive).to.be.true;
+                });
+            });
+
+            describe('when areEqual() handler throw error', () => {
+                beforeEach(() => {
+                    customHandler.areEqual = (value1: string, value2: string): boolean => {throw new Error(errorText);};
+
+                    @dbModel(table, idGenerator)
+                    class UModel extends Model {
+                        @dbField(String)
+                        username!: string;
+
+                        @dbField(Array, {handler: customHandler})
+                        tags!: string[];
+                    }
+
+                    UserModel = UModel;
+                });
+
+                it('should call areEqual() method', async () => {
+                    expect(session.isActive).to.be.true;
+
+                    await session.fetchOne(UserModel, {id: '1'});
+
+                    await expect(session.close('commit')).to.eventually.be.rejectedWith(Error, errorText);
+
+                    expect(session.isActive).to.be.true;
+                });
+            });
+            // flush
+            // parse -> from db
+            // clone -> from db -> constructor of model
+            // areEqual -> isModified() || close()
+            // serialize -> to db (update/ create)
+
+            // after error
+            // expect(session.isActive).to.to.be.true;
+            // query execute without error
+
+            // close -> rollback
+            // expect(session.isActive).to.to.be.false;
         });
     });
 });
