@@ -428,10 +428,10 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(user).to.not.be.undefined;
                 expect(user.id).to.equal('1');
 
-                expect(user.isMutable).to.be.false;
-                expect(user.isModified).to.be.false;
-                expect(user.isCreated).to.be.false;
-                expect(user.isDeleted).to.be.false;
+                expect(user.isMutable()).to.be.false;
+                expect(user.isCreated()).to.be.false;
+                expect(user.isDeleted()).to.be.false;
+                expect(user.isModified()).to.be.false;
             });
 
             it('should return all users for not read-only session', async () => {
@@ -440,10 +440,10 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(user).to.not.be.undefined;
                 expect(user.id).to.equal('1');
 
-                expect(user.isMutable).to.be.true;
-                expect(user.isModified).to.be.false;
-                expect(user.isCreated).to.be.false;
-                expect(user.isDeleted).to.be.false;
+                expect(user.isMutable()).to.be.true;
+                expect(user.isCreated()).to.be.false;
+                expect(user.isDeleted()).to.be.false;
+                expect(user.isModified()).to.be.false;
             });
         });
 
@@ -463,10 +463,10 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(users).to.have.length(4);
 
                 users.forEach((user: any) => {
-                    expect(user.isMutable).to.be.false;
-                    expect(user.isModified).to.be.false;
-                    expect(user.isCreated).to.be.false;
-                    expect(user.isDeleted).to.be.false;
+                    expect(user.isMutable()).to.be.false;
+                    expect(user.isCreated()).to.be.false;
+                    expect(user.isDeleted()).to.be.false;
+                    expect(user.isModified()).to.be.false;
                 });
             });
 
@@ -477,10 +477,10 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(users).to.have.length(4);
 
                 users.forEach((user: any) => {
-                    expect(user.isMutable).to.be.true;
-                    expect(user.isModified).to.be.false;
-                    expect(user.isCreated).to.be.false;
-                    expect(user.isDeleted).to.be.false;
+                    expect(user.isMutable()).to.be.true;
+                    expect(user.isCreated()).to.be.false;
+                    expect(user.isDeleted()).to.be.false;
+                    expect(user.isModified()).to.be.false;
                 });
             });
         });
@@ -512,10 +512,10 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(user).to.not.be.undefined;
                 expect(user.id).to.equal('1');
 
-                expect(user.isMutable).to.be.false;
-                expect(user.isModified).to.be.false;
-                expect(user.isCreated).to.be.false;
-                expect(user.isDeleted).to.be.false;
+                expect(user.isMutable()).to.be.false;
+                expect(user.isCreated()).to.be.false;
+                expect(user.isDeleted()).to.be.false;
+                expect(user.isModified()).to.be.false;
             });
 
             it('should return user when users is loaded by fetchOne() method', async () => {
@@ -530,10 +530,10 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(user).to.not.be.undefined;
                 expect(user.id).to.equal('1');
 
-                expect(user.isMutable).to.be.false;
-                expect(user.isModified).to.be.false;
-                expect(user.isCreated).to.be.false;
-                expect(user.isDeleted).to.be.false;
+                expect(user.isMutable()).to.be.false;
+                expect(user.isCreated()).to.be.false;
+                expect(user.isDeleted()).to.be.false;
+                expect(user.isModified()).to.be.false;
             });
         });
 
@@ -567,10 +567,10 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(users.size).to.equal(4);
 
                 users.forEach((user: any) => {
-                    expect(user.isMutable).to.be.false;
-                    expect(user.isModified).to.be.false;
-                    expect(user.isCreated).to.be.false;
-                    expect(user.isDeleted).to.be.false;
+                    expect(user.isMutable()).to.be.false;
+                    expect(user.isCreated()).to.be.false;
+                    expect(user.isDeleted()).to.be.false;
+                    expect(user.isModified()).to.be.false;
                 });
             });
 
@@ -588,10 +588,10 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(users.size).to.equal(1);
 
                 users.forEach((user: any) => {
-                    expect(user.isMutable).to.be.false;
-                    expect(user.isModified).to.be.false;
-                    expect(user.isCreated).to.be.false;
-                    expect(user.isDeleted).to.be.false;
+                    expect(user.isMutable()).to.be.false;
+                    expect(user.isCreated()).to.be.false;
+                    expect(user.isDeleted()).to.be.false;
+                    expect(user.isModified()).to.be.false;
                 });
             });
         });
@@ -613,10 +613,10 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(user.username).to.equal('username');
                 expect(user.tags).to.deep.equal([1,2]);
 
-                expect(user.isMutable).to.be.true;
-                // expect(user.isModified).to.be.false; //todo fix
-                expect(user.isCreated).to.be.true;
-                expect(user.isDeleted).to.be.false;
+                expect(user.isMutable()).to.be.true;
+                expect(user.isCreated()).to.be.true;
+                expect(user.isDeleted()).to.be.false;
+                expect(user.isModified()).to.be.false;
             });
 
             it('should create new record in db', async () => {
@@ -744,12 +744,17 @@ describe('NOVA.PG-DAO -> Session;', () => {
             expect(session.isActive).to.to.be.true;
         });
 
-        describe('Trying to fetch for update/create/delete models in a read-only session should throw errors', () => {
+        describe('Trying to fetch for update/create/delete models in a read-only session should throw errors', async () => {
             let UserModel: any;
 
             const readOnlyOpts = {...options, readonly: true};
 
-            beforeEach(() => {
+            beforeEach(async () => {
+
+                if ( session && session.isActive) {
+                    await session.close('commit');
+                }
+
                 session = db.getSession(readOnlyOpts, logger);
 
                 @dbModel('tmp_users', new PgIdGenerator('tmp_users_id_seq'))
@@ -777,10 +782,11 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('delete() method', async () => {
-                const user = new UserModel({id: 4, username: 'test', createdOn: 1, updatedOn: 2, tags: [1,2]});
+                const user = new UserModel({id: '4', username: 'test', createdOn: 1, updatedOn: 2, tags: [1,2]});
 
                 expect(() => session.delete(user)).to.throw(Error, 'Cannot delete model: session is read-only');
             });
+            
         });
     });
 });

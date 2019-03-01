@@ -6,11 +6,12 @@ import { ModelError } from './errors';
 
 // MODULE VARIABLES
 // ================================================================================================
-export const symDeleted = Symbol('deleted');
-export const symCreated = Symbol('created');
 export const symMutable = Symbol('mutable');
+export const symCreated = Symbol('created');
+export const symDeleted = Symbol('deleted');
 
-const symOriginal = Symbol();
+const symOriginal = Symbol('original');
+const symKeepReadonly = Symbol();
 
 // PUBLIC FUNCTIONS
 // ================================================================================================
@@ -46,6 +47,7 @@ export class Model implements IModel {
     updatedOn!              : number;
 
     [symOriginal]           : any;
+    [symKeepReadonly]       : boolean;
 
     [symMutable]            : boolean;
     [symCreated]            : boolean;
@@ -57,6 +59,8 @@ export class Model implements IModel {
         if (Array.isArray(seed)) {
             // the model is being built from database row
             if (!Array.isArray(fieldsOrClone)) throw new TypeError('Model fields are invalid');
+            this[symOriginal] = {};
+            this[symKeepReadonly] = true;   // TODO: add to arguments
             this.infuse(seed, fieldsOrClone);
         }
         else {
@@ -80,6 +84,8 @@ export class Model implements IModel {
                     this[field.name as keyof this] = (seed as any)[field.name];
                 }
             }
+
+            this[symOriginal] = undefined;
         }
 
         // validate required fields
@@ -132,23 +138,24 @@ export class Model implements IModel {
 
     // STATE ACCESSORS
     // --------------------------------------------------------------------------------------------
-    get isMutable(): boolean {
+    isMutable(): boolean {
         return this[symMutable];
     }
 
-    get isCreated(): boolean {
+    isCreated(): boolean {
         return this[symCreated];
     }
 
-    get isDeleted(): boolean {
+    isDeleted(): boolean {
         return this[symDeleted];
     }
 
-    hasChanged(checkReadonlyFields: boolean): boolean {
+    isModified(): boolean {
         const schema = (this.constructor as typeof Model).getSchema();
         const original = this[symOriginal];
-        if (!original) return false; // TODO: check if tracked?
+        if (!original) return false;
 
+        const checkReadonlyFields = this[symKeepReadonly];
         for (let field of schema.fields) {
             if (!checkReadonlyFields && field.readonly) continue;
 
@@ -171,33 +178,38 @@ export class Model implements IModel {
         if (fields.length !== rowData.length) throw new ModelError('Model row data is inconsistent');
         if (fields.length !== dbFields.length) throw new ModelError('Model fields are inconsistent');
 
-        const original: any = {};
+        const original = this[symOriginal];
+        const keepReadonly = this[symKeepReadonly];
+
         for (let i = 0; i < fields.length; i++) {
             let field = fields[i];
             let fieldName = field.name as keyof this;
             let fieldValue = field.parse ? field.parse(rowData[i]) : dbFields[i].parser(rowData[i]);
             this[fieldName] = fieldValue;
 
-            // don't keep originals of read-only fields
-            if (field.readonly) continue;
-            original[fieldName] = field.clone ? field.clone(fieldValue) : fieldValue;
+            if (original) {
+                // don't keep originals of read-only fields when not needed
+                if (!keepReadonly && field.readonly) continue;
+                original[fieldName] = field.clone ? field.clone(fieldValue) : fieldValue;
+            }
         }
         this[symOriginal] = original;
     }
 
-    getSyncQueries(checkReadonlyFields: boolean): Query[] {
+    getSyncQueries(): Query[] {
         const queries: Query[] = [];
 
-        if (this[symCreated]) {
+        if (this.isCreated()) {
             queries.push(this.buildInsertQuery());
         }
-        else if (this[symDeleted]) {
+        else if (this.isDeleted()) {
             queries.push(this.buildDeleteQuery());
         }
         else {
             // check if the model has original values
             const original = this[symOriginal];
             if (!original) return queries;
+            const checkReadonlyFields = this[symKeepReadonly];
 
             // check if any fields have changed
             const schema = (this.constructor as typeof Model).getSchema();
@@ -226,16 +238,23 @@ export class Model implements IModel {
         return queries;
     }
 
-    applyChanges() {
+    saveOriginal(keepReadonlyFields: boolean) {
         const schema = (this.constructor as typeof Model).getSchema();
         const original: any = {};
+        
         for (let field of schema.fields) {
-            if (field.readonly) continue;
+            if (!keepReadonlyFields && field.readonly) continue;
             let fieldName = field.name as keyof this;
             let fieldValue = this[fieldName];
             original[fieldName] = field.clone ? field.clone(fieldValue) : fieldValue;
         }
+
         this[symOriginal] = original;
+        this[symKeepReadonly] = keepReadonlyFields;
+    }
+
+    clearOriginal() {
+        this[symOriginal] = undefined;
     }
 
     // PRIVATE METHODS

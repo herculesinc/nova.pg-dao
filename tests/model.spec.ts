@@ -322,9 +322,9 @@ describe('NOVA.PG-DAO -> Model;', () => {
                     expect(typeof (instanceData as any)[key]).to.equal(typeof instance[key]);
                 });
 
-                expect(instance.isMutable).to.to.be.false;
-                expect(instance.isCreated).to.to.be.false;
-                expect(instance.isDeleted).to.to.be.false;
+                expect(instance.isMutable()).to.to.be.false;
+                expect(instance.isCreated()).to.to.be.false;
+                expect(instance.isDeleted()).to.to.be.false;
             });
 
             it('should contain correct field data with clone key', () => {
@@ -343,9 +343,9 @@ describe('NOVA.PG-DAO -> Model;', () => {
                     expect(typeof (instanceData as any)[key]).to.equal(typeof instance[key]);
                 });
 
-                expect(instance.isMutable).to.to.be.false;
-                expect(instance.isCreated).to.to.be.false;
-                expect(instance.isDeleted).to.to.be.false;
+                expect(instance.isMutable()).to.to.be.false;
+                expect(instance.isCreated()).to.to.be.false;
+                expect(instance.isDeleted()).to.to.be.false;
             });
 
             it('when clone set to false, updating of instance data should affect of model', () => {
@@ -416,9 +416,10 @@ describe('NOVA.PG-DAO -> Model;', () => {
                     expect((instanceData as any)[key]).to.equal(instance[key]);
                 });
 
-                expect(instance.isMutable).to.to.be.false;
-                expect(instance.isCreated).to.to.be.false;
-                expect(instance.isDeleted).to.to.be.false;
+                
+                expect(instance.isMutable()).to.to.be.false;
+                expect(instance.isCreated()).to.to.be.false;
+                expect(instance.isDeleted()).to.to.be.false;
             });
         });
     });
@@ -467,69 +468,6 @@ describe('NOVA.PG-DAO -> Model;', () => {
 
                 expect(instance[key]).to.equal(value);
             });
-        });
-    });
-
-    describe('Model.applyChanges() method', () => {
-        let instanceData: any, rowData: any, fields: any;
-        let instance1: any;
-        let instance2: any;
-
-        beforeEach(() => {
-            @dbModel(table, idGenerator)
-            class TestModel extends Model {
-                @dbField(Number)
-                num!: number;
-
-                @dbField(Object, {readonly: true})
-                str!: string;
-            }
-
-            instanceData = {id: '1', createdOn: Date.now(), updatedOn: Date.now(), num: 123, str: 'str'};
-            instance1 = new TestModel(instanceData);
-
-            rowData = ['2', 123456, 789021, 345, '123'];
-
-            fields = [
-                {name: 'id',        oid: 1, parser: parser},
-                {name: 'createdOn', oid: 2, parser: parser},
-                {name: 'updatedOn', oid: 3, parser: parser},
-                {name: 'num',       oid: 4, parser: parser},
-                {name: 'str',       oid: 5, parser: parser}
-            ];
-
-            instance2 = new TestModel(rowData, fields);
-        });
-
-        it('should apply changes for model without errors', () => {
-            expect(() => {
-                instance1.applyChanges();
-                instance2.applyChanges();
-            }).to.not.throw();
-        });
-
-        it('should update model for not readonly field', () => { //todo
-            expect(instance1.isModified).to.be.false;
-
-            instance1.num = 12;
-
-            expect(instance1.isModified).to.be.true;
-
-            instance1.applyChanges();
-
-            expect(instance1.isModified).to.be.false;
-        });
-
-        it('should update model for not readonly field', () => {
-            expect(instance2.isModified).to.be.false;
-
-            instance2.num = 12;
-
-            expect(instance2.isModified).to.be.true;
-
-            instance2.applyChanges();
-
-            expect(instance2.isModified).to.be.false;
         });
     });
 
@@ -856,44 +794,6 @@ describe('NOVA.PG-DAO -> Model;', () => {
                         });
                     });
                 });
-            });
-        });
-
-        describe('Model.applyChanges() method', () => {
-            let instanceData: any, rowData: any, fields: any;
-            let instance1: any;
-            let instance2: any;
-
-            beforeEach(() => {
-                @dbModel(table, idGenerator)
-                class TestModel extends Model {
-                    @dbField(Object, {readonly: true})
-                    str!: string;
-                }
-
-                instanceData = {id: '1', createdOn: Date.now(), updatedOn: Date.now(), str: 'str'};
-                instance1 = new TestModel(instanceData);
-
-                rowData = ['2', 123456, 789021, '123'];
-
-                fields = [
-                    {name: 'id',        oid: 1, parser: parser},
-                    {name: 'createdOn', oid: 2, parser: parser},
-                    {name: 'updatedOn', oid: 3, parser: parser},
-                    {name: 'str',       oid: 4, parser: parser}
-                ];
-
-                instance2 = new TestModel(rowData, fields);
-            });
-
-            it('should return error for readonly field', () => {
-                instance1.str = '1234';
-                expect(() => instance1.applyChanges()).to.throw(Error, 'error text');
-            });
-
-            it('should return error for readonly field', () => {
-                instance2.str = '1234';
-                expect(() => instance2.applyChanges()).to.throw(Error, 'error text');
             });
         });
     });

@@ -14,13 +14,13 @@ interface StoreConfig {
 // ================================================================================================
 export class Store {
 
-    private readonly cache          : Map<typeof Model, Map<string, Model>>;
+    private readonly models         : Map<string, Model>;
     private readonly checkImmutable : boolean;
 
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     constructor(config: StoreConfig) {
-        this.cache = new Map();
+        this.models = new Map();
         this.checkImmutable = config.checkImmutable;
     }
 
@@ -30,43 +30,49 @@ export class Store {
         if (!isModelClass(type)) throw new TypeError('Cannot get model: model type is invalid');
         if (typeof id !== 'string') throw new TypeError('Cannot get model: model id is invalid');
 
-        const storedModels = this.cache.get(type);
-        if (storedModels) {
-            const model = storedModels.get(id);
-            if (model && !model.isDeleted) return model as T;
-        }
+        const uid = type.name + '::' + id;
+        const model = this.models.get(uid);
+        if (model && !model[symDeleted]) return model as T;
     }
 
     getAll<T extends Model>(type: typeof Model): ReadonlyMap<string, T> {
         if (!isModelClass(type)) throw new TypeError('Cannot get model: model type is invalid');
 
-        const models = this.cache.get(type);
-        return models ? models : new Map();
+        const models = new Map<string, T>();
+        for (let model of this.models.values()) {
+            if (model instanceof type && !model[symDeleted]) {
+                models.set(model.id, model as T);
+            }
+        }
+        return models;
     }
 
     // LOADING METHODS
     // --------------------------------------------------------------------------------------------
-    load(modelClass: typeof Model, rows: string[][], fields: FieldDescriptor[], mutable: boolean) {
-        if (!isModelClass(modelClass)) throw new TypeError('Cannot load model: model class is invalid');
+    load(type: typeof Model, rows: string[][], fields: FieldDescriptor[], mutable: boolean) {
+        if (!isModelClass(type)) throw new TypeError('Cannot load model: model class is invalid');
 
         const models: Model[] = [];
-        const storedModels = this.getModelMap(modelClass, true)!;
 
         for (let rowData of rows) {
-            let model = storedModels.get(rowData[0]);
+            let uid = type.name + '::' + rowData[0];
+            let model = this.models.get(uid);
             if (model) {
-                if (model.isMutable) {
-                    if (model.isDeleted) throw new ModelError(`Cannot reload ${modelClass.name} model: model has been deleted`);
-                    if (model.isCreated) throw new ModelError(`Cannot reload ${modelClass.name} model: model is newly inserted`);
-                    if (model.hasChanged(this.checkImmutable))  {
-                        throw new ModelError(`Cannot reload ${modelClass.name} model: model has been modified`);
+                // don't reload deleted models
+                if (model[symDeleted]) continue;
+
+                // check if the model can be reloaded
+                if (model[symMutable]) {
+                    if (model[symCreated]) throw new ModelError(`Cannot reload ${type.name} model: model is newly inserted`);
+                    if (model.isModified())  {
+                        throw new ModelError(`Cannot reload ${type.name} model: model has been modified`);
                     }
                 }
                 model.infuse(rowData, fields);
             }
             else {
-                model = new modelClass(rowData, fields);
-                storedModels.set(model.id, model);
+                model = new type(rowData, fields);
+                this.models.set(uid, model);
             }
             model[symMutable] = mutable;
             models.push(model);
@@ -76,35 +82,38 @@ export class Store {
     }
 
     insert(model: Model, created: boolean) {
-        const modelClass = getModelClass(model);
-        if (model.isDeleted) throw new ModelError(`Cannot insert ${modelClass.name} model: model has been deleted`);
+        const type = getModelClass(model);
+        if (model[symDeleted]) throw new ModelError(`Cannot insert ${type.name} model: model has been deleted`);
 
-        const storedModels = this.getModelMap(modelClass, true)!;
-        if (storedModels.has(model.id)) throw new ModelError(`Cannot insert ${modelClass.name} model: model has already been inserted`);
+        const uid = type.name + '::' + model.id;
+        if (this.models.has(uid)) throw new ModelError(`Cannot insert ${type.name} model: model has already been inserted`);
 
         if (created) {
-            model[symCreated] = true;
             model[symMutable] = true;
+            model[symCreated] = true;
+        }
+        else {
+            // TODO: make based on config
+            model.saveOriginal(true);
         }
 
-        storedModels.set(model.id, model);
+        this.models.set(uid, model);
 
         return model;
     }
 
     delete(model: Model) {
-        const modelClass = getModelClass(model);
-        if (!model.isMutable) throw new ModelError(`Cannot delete ${modelClass.name} model: model is not mutable`);
-        if (!model.isDeleted) throw new ModelError(`Cannot delete ${modelClass.name} model: model has already been deleted`);
+        const type = getModelClass(model);
+        if (!model[symMutable]) throw new ModelError(`Cannot delete ${type.name} model: model is not mutable`);
+        if (model[symDeleted]) throw new ModelError(`Cannot delete ${type.name} model: model has already been deleted`);
 
-        const storedModels = this.cache.get(modelClass);
-        if (!storedModels) throw new ModelError(`Cannot delete ${modelClass.name} model: model has not been loaded`);
-        const storedModel = storedModels.get(model.id);
-        if (!storedModel) throw new ModelError(`Cannot delete ${modelClass.name} model: model has not been loaded`);
-        if (storedModel !== model) throw new ModelError(`Cannot delete ${modelClass.name} model: a different model with the same ID was found in the store`);
+        const uid = type.name + '::' + model.id;
+        const storedModel = this.models.get(uid);
+        if (!storedModel) throw new ModelError(`Cannot delete ${type.name} model: model has not been loaded`);
+        if (storedModel !== model) throw new ModelError(`Cannot delete ${type.name} model: a different model with the same ID was found in the store`);
 
-        if (model.isCreated) {
-            storedModels.delete(model.id);
+        if (model[symCreated]) {
+            this.models.delete(uid);
             model[symCreated] = false;
         }
         model[symDeleted] = true;
@@ -119,31 +128,27 @@ export class Store {
 
         if (this.checkImmutable) {
             // iterate through models and check every model for changes
-            for (let models of this.cache.values()) {
-                for (let model of models.values()) {
-                    const mQueries = model.getSyncQueries(true);
-                    if (mQueries.length === 1) {
-                        queries.push(mQueries[0]);
-                    }
-                    else if (mQueries.length > 1) {
-                        queries = [ ...queries, ...mQueries ];
-                    }
+            for (let model of this.models.values()) {
+                const mQueries = model.getSyncQueries();
+                if (mQueries.length === 1) {
+                    queries.push(mQueries[0]);
+                }
+                else if (mQueries.length > 1) {
+                    queries = [ ...queries, ...mQueries ];
                 }
             }
         }
         else {
             // check only mutable models for changes
-            for (let models of this.cache.values()) {
-                for (let model of models.values()) {
-                    if (!model.isMutable) continue;
-                    const mQueries = model.getSyncQueries(false);
-                    if (mQueries.length > 0) {
-                        if (mQueries.length === 1) {
-                            queries.push(mQueries[0]);
-                        }
-                        else if (mQueries.length > 1) {
-                            queries = [ ...queries, ...mQueries ];
-                        }
+            for (let model of this.models.values()) {
+                if (!model[symMutable]) continue;
+                const mQueries = model.getSyncQueries();
+                if (mQueries.length > 0) {
+                    if (mQueries.length === 1) {
+                        queries.push(mQueries[0]);
+                    }
+                    else if (mQueries.length > 1) {
+                        queries = [ ...queries, ...mQueries ];
                     }
                 }
             }
@@ -154,29 +159,20 @@ export class Store {
 
     applyChanges() {
 
-        for (let models of this.cache.values()) {
-            for (let model of models.values()) {
-                if (!model.isMutable) continue;
+        for (let model of this.models.values()) {
+            if (!model[symMutable]) continue;
 
-                if (model.isDeleted) {
-                    models.delete(model.id);
-                }
-                else {
-                    model.applyChanges();
-                }
+            if (model[symDeleted]) {
+                const type = getModelClass(model);
+                const uid = type.name + '::' + model.id;
+                this.models.delete(uid);
+                model.clearOriginal();
+            }
+            else {
+                // TODO: make based on config
+                model.saveOriginal(true);
             }
         }
 
-    }
-
-    // PRIVATE METHODS
-    // --------------------------------------------------------------------------------------------
-    private getModelMap(modelClass: typeof Model, create = false) {
-        let modelMap = this.cache.get(modelClass);
-        if (create && modelMap === undefined) {
-            modelMap = new Map<string, Model>();
-            this.cache.set(modelClass, modelMap);
-        }
-        return modelMap;
     }
 }
