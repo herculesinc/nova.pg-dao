@@ -171,6 +171,7 @@ export class Store {
             else {
                 // TODO: make based on config
                 model.saveOriginal(true);
+                model[symCreated] = false;
             }
         }
 

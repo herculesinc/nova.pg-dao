@@ -749,15 +749,29 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
         afterEach(async () => {
             if (session && session.isActive) {
-                console.log('closing')
                 await session.close('commit');
-                console.log('closed')
             }
         });
 
         describe('flush() method', () => {
             it('should be called without an error', async () => {
                 await session.flush();
+            });
+
+            it('state of flushed models should be updated correctly', async () => {
+                await session.flush();
+
+                [created, updated].forEach((model: any) => {
+                    expect(model.isMutable()).to.be.true;
+                    expect(model.isCreated()).to.be.false;
+                    expect(model.isDeleted()).to.be.false;
+                    expect(model.isModified()).to.be.false;
+                });
+
+                expect(deleted.isMutable()).to.be.true;
+                expect(deleted.isCreated()).to.be.false;
+                expect(deleted.isDeleted()).to.be.true;
+                expect(deleted.isModified()).to.be.false;
             });
 
             it('db should be updated after flush() method', async () => {
@@ -978,20 +992,23 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 await expect(session.close('commit')).to.eventually.be.rejectedWith(Error, 'Cannot close session: session has already been closed');
             });
 
-            it('Closing read-only session with dirty models should throw an error', async () => { // todo
+            it('Closing read-only session with dirty models should throw an error', async () => {
+                session = db.getSession(options, logger);
+
+                await prepareDatabase(session);
+                await session.close('commit');
+
                 session = db.getSession(readOnlyOpts, logger);
 
                 expect(session.isReadOnly).to.be.true;
 
-                session.load(UserModel, {id: '4', username: 'test', createdOn: 1, updatedOn: 2, tags: [1,2]});
-
-                const user = session.getOne(UserModel, '4');
+                const user = await session.fetchOne(UserModel, {id: '4'});
 
                 expect(user).to.not.be.undefined;
 
                 user.username = 'username';
 
-                await expect(session.close('commit')).to.eventually.be.rejectedWith(Error, 'Cannot close session: session has already been closed');
+                await expect(session.close('commit')).to.eventually.be.rejectedWith(Error, 'Error while closing session: Dirty models detected in read-only session');
             });
 
             describe('Closing session with invalid action should throw an error', () => {

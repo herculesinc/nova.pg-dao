@@ -150,6 +150,7 @@ class Store {
             else {
                 // TODO: make based on config
                 model.saveOriginal(true);
+                model[Model_1.symCreated] = false;
             }
         }
     }
