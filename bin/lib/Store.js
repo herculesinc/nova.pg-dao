@@ -101,10 +101,13 @@ class Store {
     // --------------------------------------------------------------------------------------------
     getSyncQueries() {
         let queries = [];
+        const updatedOn = Date.now();
         if (this.checkImmutable) {
             // iterate through models and check every model for changes
             for (let model of this.models.values()) {
-                const mQueries = model.getSyncQueries();
+                const mQueries = model.getSyncQueries(updatedOn);
+                if (!mQueries)
+                    continue;
                 if (mQueries.length === 1) {
                     queries.push(mQueries[0]);
                 }
@@ -118,7 +121,9 @@ class Store {
             for (let model of this.models.values()) {
                 if (!model[Model_1.symMutable])
                     continue;
-                const mQueries = model.getSyncQueries();
+                const mQueries = model.getSyncQueries(updatedOn);
+                if (!mQueries)
+                    continue;
                 if (mQueries.length > 0) {
                     if (mQueries.length === 1) {
                         queries.push(mQueries[0]);

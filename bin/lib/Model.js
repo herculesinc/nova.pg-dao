@@ -164,21 +164,20 @@ class Model {
         }
         this[symOriginal] = original;
     }
-    getSyncQueries() {
-        const queries = [];
+    getSyncQueries(updatedOn) {
         if (this.isCreated()) {
-            queries.push(this.buildInsertQuery());
+            return [this.buildInsertQuery()];
         }
         else if (this.isDeleted()) {
-            queries.push(this.buildDeleteQuery());
+            return [this.buildDeleteQuery()];
         }
         else {
             // check if the model has original values
             const original = this[symOriginal];
             if (!original)
-                return queries;
-            const checkReadonlyFields = this[symKeepReadonly];
+                return undefined;
             // check if any fields have changed
+            const checkReadonlyFields = this[symKeepReadonly];
             const schema = this.constructor.getSchema();
             const changes = [];
             for (let field of schema.fields) {
@@ -197,10 +196,11 @@ class Model {
                 }
             }
             if (changes.length > 0) {
-                queries.push(this.buildUpdateQuery(changes));
+                this.updatedOn = updatedOn;
+                changes.push(schema.getField('updatedOn'));
+                return [this.buildUpdateQuery(changes)];
             }
         }
-        return queries;
     }
     saveOriginal(keepReadonlyFields) {
         const schema = this.constructor.getSchema();

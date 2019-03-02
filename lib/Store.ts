@@ -118,12 +118,15 @@ export class Store {
     // SYNC METHODS
     // --------------------------------------------------------------------------------------------
     getSyncQueries(): Query[] {
+
         let queries: Query[] = [];
+        const updatedOn = Date.now();
 
         if (this.checkImmutable) {
             // iterate through models and check every model for changes
             for (let model of this.models.values()) {
-                const mQueries = model.getSyncQueries();
+                const mQueries = model.getSyncQueries(updatedOn);
+                if (!mQueries) continue;
                 if (mQueries.length === 1) {
                     queries.push(mQueries[0]);
                 }
@@ -136,7 +139,8 @@ export class Store {
             // check only mutable models for changes
             for (let model of this.models.values()) {
                 if (!model[symMutable]) continue;
-                const mQueries = model.getSyncQueries();
+                const mQueries = model.getSyncQueries(updatedOn);
+                if (!mQueries) continue;
                 if (mQueries.length > 0) {
                     if (mQueries.length === 1) {
                         queries.push(mQueries[0]);

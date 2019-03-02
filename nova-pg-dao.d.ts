@@ -272,7 +272,7 @@ declare module "@nova/pg-dao" {
         readonly updatedOn  : number;
 
         infuse(rowData: string[], fields: FieldDescriptor[]): void;
-        getSyncQueries(): Query[];
+        getSyncQueries(updatedOn: number): Query[] | undefined;
 
         isMutable(): boolean;
         isCreated(): boolean;

@@ -196,22 +196,20 @@ export class Model implements IModel {
         this[symOriginal] = original;
     }
 
-    getSyncQueries(): Query[] {
-        const queries: Query[] = [];
-
+    getSyncQueries(updatedOn: number): Query[] | undefined {
         if (this.isCreated()) {
-            queries.push(this.buildInsertQuery());
+            return [this.buildInsertQuery()];
         }
         else if (this.isDeleted()) {
-            queries.push(this.buildDeleteQuery());
+            return [this.buildDeleteQuery()];
         }
         else {
             // check if the model has original values
             const original = this[symOriginal];
-            if (!original) return queries;
-            const checkReadonlyFields = this[symKeepReadonly];
+            if (!original) return undefined;
 
             // check if any fields have changed
+            const checkReadonlyFields = this[symKeepReadonly];
             const schema = (this.constructor as typeof Model).getSchema();
             const changes: DbField[] = [];
             for (let field of schema.fields) {
@@ -231,11 +229,11 @@ export class Model implements IModel {
             }
 
             if (changes.length > 0) {
-                queries.push(this.buildUpdateQuery(changes));
+                this.updatedOn = updatedOn;
+                changes.push(schema.getField('updatedOn')!);
+                return [this.buildUpdateQuery(changes)];
             }
         }
-
-        return queries;
     }
 
     saveOriginal(keepReadonlyFields: boolean) {
