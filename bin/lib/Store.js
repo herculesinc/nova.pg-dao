@@ -36,35 +36,29 @@ class Store {
     }
     // LOADING METHODS
     // --------------------------------------------------------------------------------------------
-    load(type, rows, fields, mutable) {
-        if (!Model_1.isModelClass(type))
-            throw new TypeError('Cannot load model: model class is invalid');
-        const models = [];
-        for (let rowData of rows) {
-            let uid = type.name + '::' + rowData[0];
-            let model = this.models.get(uid);
-            if (model) {
-                // don't reload deleted models
-                if (model[Model_1.symDeleted])
-                    continue;
-                // check if the model can be reloaded
-                if (model[Model_1.symMutable]) {
-                    if (model[Model_1.symCreated])
-                        throw new errors_1.ModelError(`Cannot reload ${type.name} model: model is newly inserted`);
-                    if (model.isModified()) {
-                        throw new errors_1.ModelError(`Cannot reload ${type.name} model: model has been modified`);
-                    }
+    load(type, rowData, fields, mutable) {
+        let uid = type.name + '::' + rowData[0];
+        let model = this.models.get(uid);
+        if (model) {
+            // don't reload deleted models
+            if (model[Model_1.symDeleted])
+                return undefined;
+            // check if the model can be reloaded
+            if (model[Model_1.symMutable]) {
+                if (model[Model_1.symCreated])
+                    throw new errors_1.ModelError(`Cannot reload ${type.name} model: model is newly inserted`);
+                if (model.isModified()) {
+                    throw new errors_1.ModelError(`Cannot reload ${type.name} model: model has been modified`);
                 }
-                model.infuse(rowData, fields);
             }
-            else {
-                model = new type(rowData, fields);
-                this.models.set(uid, model);
-            }
-            model[Model_1.symMutable] = mutable;
-            models.push(model);
+            model.infuse(rowData, fields);
         }
-        return models;
+        else {
+            model = new type(rowData, fields);
+            this.models.set(uid, model);
+        }
+        model[Model_1.symMutable] = mutable;
+        return model;
     }
     insert(model, created) {
         const type = Model_1.getModelClass(model);

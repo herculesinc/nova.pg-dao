@@ -21,10 +21,9 @@ const enum RowsToParse {
 export class ModelResult implements Result {
 
     command?            : string;
-    readonly rows       : string[][];
     readonly fields     : FieldDescriptor[];
     private models      : Model[];
-    readonly modelClass : typeof Model;
+    readonly modelType : typeof Model;
     readonly store      : Store;
     readonly mutable    : boolean;
     readonly promise    : Promise<any>;
@@ -35,11 +34,10 @@ export class ModelResult implements Result {
 
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(mask: QueryMask, mutable: boolean, modelClass: typeof Model, store: Store) {
-        this.rows = [];
+    constructor(mask: QueryMask, mutable: boolean, modelType: typeof Model, store: Store) {
         this.fields = [];
         this.models = [];
-        this.modelClass = modelClass;
+        this.modelType = modelType;
         this.store = store;
         this.mutable = mutable;
         this.rowsToParse = (mask === 'single') ? RowsToParse.one : RowsToParse.many;
@@ -56,7 +54,7 @@ export class ModelResult implements Result {
     }
 
     get rowCount(): number {
-        return this.rows.length;
+        return this.models.length;
     }
 
     // PUBLIC METHODS
@@ -83,11 +81,13 @@ export class ModelResult implements Result {
             }
         }
         
-        this.rows.push(rowData);
+        const model = this.store.load(this.modelType, rowData, this.fields, this.mutable);
+        if (model) {
+            this.models.push(model);
+        }
     }
 
     complete(command: string, rows: number) {
-        this.models = this.store.load(this.modelClass, this.rows, this.fields, this.mutable);
         this.command = command;
     }
 

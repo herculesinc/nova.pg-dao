@@ -12,11 +12,10 @@ const getTypeParser = pg_1.types.getTypeParser;
 class ModelResult {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(mask, mutable, modelClass, store) {
-        this.rows = [];
+    constructor(mask, mutable, modelType, store) {
         this.fields = [];
         this.models = [];
-        this.modelClass = modelClass;
+        this.modelType = modelType;
         this.store = store;
         this.mutable = mutable;
         this.rowsToParse = (mask === 'single') ? 1 /* one */ : 2 /* many */;
@@ -31,7 +30,7 @@ class ModelResult {
         return (this.command !== undefined);
     }
     get rowCount() {
-        return this.rows.length;
+        return this.models.length;
     }
     // PUBLIC METHODS
     // --------------------------------------------------------------------------------------------
@@ -55,10 +54,12 @@ class ModelResult {
                 return;
             }
         }
-        this.rows.push(rowData);
+        const model = this.store.load(this.modelType, rowData, this.fields, this.mutable);
+        if (model) {
+            this.models.push(model);
+        }
     }
     complete(command, rows) {
-        this.models = this.store.load(this.modelClass, this.rows, this.fields, this.mutable);
         this.command = command;
     }
     end(error) {
