@@ -23,7 +23,7 @@ export class ModelResult implements Result {
     command?            : string;
     readonly fields     : FieldDescriptor[];
     private models      : Model[];
-    readonly modelType : typeof Model;
+    readonly modelType  : typeof Model;
     readonly store      : Store;
     readonly mutable    : boolean;
     readonly promise    : Promise<any>;

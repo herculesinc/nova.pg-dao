@@ -17,6 +17,7 @@ exports.Operators = schema_1.Operators;
 exports.Timestamp = schema_1.Timestamp;
 var errors_1 = require("./lib/errors");
 exports.ConnectionError = errors_1.ConnectionError;
+exports.SessionError = errors_1.SessionError;
 exports.QueryError = errors_1.QueryError;
 exports.ParseError = errors_1.ParseError;
 exports.ModelError = errors_1.ModelError;

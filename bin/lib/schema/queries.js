@@ -64,8 +64,13 @@ function buildUpdateQueryClass(schema) {
             for (let field of changes) {
                 let paramValue = model[field.name];
                 if (field.serialize) {
-                    // make sure custom serialization is respected
-                    paramValue = field.serialize(paramValue);
+                    try {
+                        // make sure custom serialization is respected
+                        paramValue = field.serialize(paramValue);
+                    }
+                    catch (error) {
+                        throw new errors_1.ModelError(`Failed to serialize ${schema.name} model`, error);
+                    }
                 }
                 setters.push(`${field.snakeName}=${Query_1.stringifySingleParam(paramValue, values)}`);
             }

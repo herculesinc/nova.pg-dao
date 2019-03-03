@@ -1,9 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+// IMPORTS
+// ================================================================================================
+const core_1 = require("@nova/core");
 const results_1 = require("./results");
 const errors_1 = require("./errors");
 const util = require("./util");
-;
+const ModelResult_1 = require("./results/ModelResult");
 // MODULE VARIABLES
 // ================================================================================================
 const COMMAND_COMPLETE_REGEX = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/;
@@ -99,7 +102,15 @@ class Command {
         }
         catch (error) {
             const query = this.queries[this.cursor];
-            this.canceledDueToError = new errors_1.ParseError(`Failed to parse results for ${query.name} query`, error);
+            if (error instanceof core_1.Exception) {
+                this.canceledDueToError = error;
+            }
+            else {
+                const result = this.results[this.cursor];
+                this.canceledDueToError = (result instanceof ModelResult_1.ModelResult)
+                    ? new errors_1.ModelError(`Failed to build ${result.modelType.name} model`, error)
+                    : new errors_1.ParseError(`Failed to parse results for ${query.name} query`, error);
+            }
         }
     }
     handleCommandComplete(message, connection) {
@@ -133,6 +144,9 @@ class Command {
         if (this.canceledDueToError) {
             error = this.canceledDueToError;
             this.canceledDueToError = undefined;
+        }
+        if (error instanceof core_1.Exception === false) {
+            error = new errors_1.QueryError(error);
         }
         const ts = Date.now();
         for (let i = 0; i < this.results.length; i++) {
@@ -169,10 +183,10 @@ exports.Command = Command;
 // ================================================================================================
 function validateQueryText(text) {
     if (typeof text !== 'string')
-        throw new TypeError('Query text must be a string');
+        throw new errors_1.QueryError('Query text must be a string');
     text = text.trim();
     if (text === '')
-        throw new TypeError('Query text cannot be an empty string');
+        throw new errors_1.QueryError('Query text cannot be an empty string');
     if (text.charAt(text.length - 1) !== ';') {
         text = text + ';';
     }

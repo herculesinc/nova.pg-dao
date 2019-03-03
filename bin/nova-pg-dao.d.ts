@@ -308,6 +308,11 @@ declare module "@nova/pg-dao" {
 	    constructor(message: string, cause?: Error);
     }
 
+    export class SessionError extends Exception {
+        constructor(cause: Error);
+	    constructor(message: string, cause?: Error);
+    }
+
     export class QueryError extends Exception {
         constructor(cause: Error);
 	    constructor(message: string, cause?: Error);

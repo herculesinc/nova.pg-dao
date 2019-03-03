@@ -1,11 +1,12 @@
 // IMPORTS
 // ================================================================================================
-import { Logger, TraceSource, TraceCommand } from '@nova/core';
+import { Logger, TraceSource, TraceCommand, Exception } from '@nova/core';
 import { Result, createResult } from './results';
 import { Query } from './Query';
 import { Store } from './Store'
-import { QueryError, ParseError } from './errors';
-import * as util from './util';;
+import { QueryError, ParseError, ModelError } from './errors';
+import * as util from './util';
+import { ModelResult } from './results/ModelResult';
 
 // MODULE VARIABLES
 // ================================================================================================
@@ -130,7 +131,15 @@ export class Command implements IQuery {
             this.results[this.cursor].addRow(message.fields);
         } catch (error) {
             const query = this.queries[this.cursor];
-            this.canceledDueToError = new ParseError(`Failed to parse results for ${query.name} query`, error);
+            if (error instanceof Exception) {
+                this.canceledDueToError = error;
+            }
+            else {
+                const result = this.results[this.cursor];
+                this.canceledDueToError = (result instanceof ModelResult)
+                    ? new ModelError(`Failed to build ${result.modelType.name} model`, error)
+                    : new ParseError(`Failed to parse results for ${query.name} query`, error);
+            }
         }
     }
 
@@ -171,6 +180,10 @@ export class Command implements IQuery {
         if (this.canceledDueToError) {
             error = this.canceledDueToError
             this.canceledDueToError = undefined;
+        }
+
+        if (error instanceof Exception === false) {
+            error = new QueryError(error);
         }
         
         const ts = Date.now();
@@ -213,9 +226,9 @@ export class Command implements IQuery {
 // HELPER FUNCTIONS
 // ================================================================================================
 function validateQueryText(text: string) {
-    if (typeof text !== 'string') throw new TypeError('Query text must be a string');
+    if (typeof text !== 'string') throw new QueryError('Query text must be a string');
     text = text.trim();
-    if (text === '') throw new TypeError('Query text cannot be an empty string');
+    if (text === '') throw new QueryError('Query text cannot be an empty string');
     if (text.charAt(text.length - 1) !== ';') {
         text = text + ';';
     }

@@ -2,7 +2,7 @@
 // ================================================================================================
 import { Query, FieldDescriptor } from '@nova/pg-dao';
 import { Model, symMutable, symCreated, symDeleted, getModelClass, isModelClass } from './Model';
-import { ModelError } from './errors';
+import { ModelError, SessionError } from './errors';
 
 // INTERFACES
 // ================================================================================================
@@ -59,9 +59,9 @@ export class Store {
 
             // check if the model can be reloaded
             if (model[symMutable]) {
-                if (model[symCreated]) throw new ModelError(`Cannot reload ${type.name} model: model is newly inserted`);
+                if (model[symCreated]) throw new SessionError(`Cannot reload ${type.name} model: model is newly inserted`);
                 if (model.isModified()) {
-                    throw new ModelError(`Cannot reload ${type.name} model: model has been modified`);
+                    throw new SessionError(`Cannot reload ${type.name} model: model has been modified`);
                 }
             }
             model.infuse(rowData, fields);

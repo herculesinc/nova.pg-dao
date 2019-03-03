@@ -46,9 +46,9 @@ class Store {
             // check if the model can be reloaded
             if (model[Model_1.symMutable]) {
                 if (model[Model_1.symCreated])
-                    throw new errors_1.ModelError(`Cannot reload ${type.name} model: model is newly inserted`);
+                    throw new errors_1.SessionError(`Cannot reload ${type.name} model: model is newly inserted`);
                 if (model.isModified()) {
-                    throw new errors_1.ModelError(`Cannot reload ${type.name} model: model has been modified`);
+                    throw new errors_1.SessionError(`Cannot reload ${type.name} model: model has been modified`);
                 }
             }
             model.infuse(rowData, fields);

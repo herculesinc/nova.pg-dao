@@ -711,16 +711,16 @@ describe('NOVA.PG-DAO -> Model;', () => {
                         {seed: '',                                         ErrorType: TypeError,  error: invalidSeedErrorText},
                         {seed: 1234,                                       ErrorType: TypeError,  error: invalidSeedErrorText},
 
-                        {seed: {},                                         ErrorType: ModelError, error: 'Model ID is invalid'},
-                        {seed: {id: null},                                 ErrorType: ModelError, error: 'Model ID is invalid'},
-                        {seed: {id: 0},                                    ErrorType: ModelError, error: 'Model ID is invalid'},
-                        {seed: {id: 1},                                    ErrorType: ModelError, error: 'Model ID is invalid'},
+                        {seed: {},                                         ErrorType: ModelError, error: `Failed to build TestModel model: model ID is invalid`},
+                        {seed: {id: null},                                 ErrorType: ModelError, error: `Failed to build TestModel model: model ID is invalid`},
+                        {seed: {id: 0},                                    ErrorType: ModelError, error: `Failed to build TestModel model: model ID is invalid`},
+                        {seed: {id: 1},                                    ErrorType: ModelError, error: `Failed to build TestModel model: model ID is invalid`},
 
-                        {seed: {id: '1'},                                  ErrorType: ModelError, error: 'Model createdOn is invalid'},
-                        {seed: {id: '1', createdOn: null},                 ErrorType: ModelError, error: 'Model createdOn is invalid'},
+                        {seed: {id: '1'},                                  ErrorType: ModelError, error: 'Failed to build TestModel model: createdOn is invalid'},
+                        {seed: {id: '1', createdOn: null},                 ErrorType: ModelError, error: 'Failed to build TestModel model: createdOn is invalid'},
 
-                        {seed: {id: '1', createdOn: 123},                  ErrorType: ModelError, error: 'Model updatedOn is invalid'},
-                        {seed: {id: '1', createdOn: 123, updatedOn: null}, ErrorType: ModelError, error: 'Model updatedOn is invalid'},
+                        {seed: {id: '1', createdOn: 123},                  ErrorType: ModelError, error: 'Failed to build TestModel model: updatedOn is invalid'},
+                        {seed: {id: '1', createdOn: 123, updatedOn: null}, ErrorType: ModelError, error: 'Failed to build TestModel model: updatedOn is invalid'},
 
                     ].forEach((test: any) => {
                         const {seed, error, ErrorType} = test;

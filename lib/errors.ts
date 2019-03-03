@@ -17,6 +17,19 @@ export class ConnectionError extends Exception {
 	}
 }
 
+export class SessionError extends Exception {
+	constructor(cause: Error);
+	constructor(message: string, cause?: Error)
+	constructor(messageOrCause: string | Error, cause?: Error) {
+		if (typeof messageOrCause === 'string') {
+			super({ name: 'Session Error', message: messageOrCause, cause })
+		}
+		else {
+			super({ name: 'Session Error', cause: messageOrCause })
+		}
+	}
+}
+
 export class QueryError extends Exception {
 	constructor(cause: Error);
 	constructor(message: string, cause?: Error)

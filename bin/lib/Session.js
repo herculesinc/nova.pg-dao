@@ -51,7 +51,7 @@ class DaoSession {
             throw new TypeError('Cannot fetch model: forUpdate flag is invalid');
         }
         else if (forUpdate && this.isReadOnly) {
-            throw new errors_1.ConnectionError('Cannot fetch mutable model: session is read-only');
+            throw new errors_1.SessionError('Cannot fetch mutable model: session is read-only');
         }
         const qSelectModel = type.SelectQuery('single');
         const query = new qSelectModel(forUpdate || false, selector);
@@ -68,7 +68,7 @@ class DaoSession {
             throw new TypeError('Cannot fetch models: forUpdate flag is invalid');
         }
         else if (forUpdate && this.isReadOnly) {
-            throw new errors_1.ConnectionError('Cannot fetch mutable models: session is read-only');
+            throw new errors_1.SessionError('Cannot fetch mutable models: session is read-only');
         }
         const qSelectModels = type.SelectQuery('list');
         const query = new qSelectModels(forUpdate || false, selector);
@@ -78,7 +78,7 @@ class DaoSession {
         if (!Model_1.isModelClass(type))
             throw new TypeError('Cannot load model: model type is invalid');
         if (!this.isActive) {
-            throw new errors_1.ConnectionError('Cannot load model: session has already been closed');
+            throw new errors_1.SessionError('Cannot load model: session has already been closed');
         }
         const model = new type(seed, false);
         this.store.insert(model, false);
@@ -88,10 +88,10 @@ class DaoSession {
         if (!Model_1.isModelClass(type))
             throw new TypeError('Cannot create model: model type is invalid');
         if (!this.isActive) {
-            throw new errors_1.ConnectionError('Cannot create model: session has already been closed');
+            throw new errors_1.SessionError('Cannot create model: session has already been closed');
         }
         else if (this.isReadOnly) {
-            throw new errors_1.ConnectionError('Cannot create model: session is read-only');
+            throw new errors_1.SessionError('Cannot create model: session is read-only');
         }
         // create new model
         const id = await type.getSchema().idGenerator.getNextId(this.logger, this);
@@ -104,10 +104,10 @@ class DaoSession {
     }
     delete(model) {
         if (!this.isActive) {
-            throw new errors_1.ConnectionError('Cannot delete model: session has already been closed');
+            throw new errors_1.SessionError('Cannot delete model: session has already been closed');
         }
         else if (this.isReadOnly) {
-            throw new errors_1.ConnectionError('Cannot delete model: session is read-only');
+            throw new errors_1.SessionError('Cannot delete model: session is read-only');
         }
         this.store.delete(model);
         return model;
@@ -116,10 +116,10 @@ class DaoSession {
     // --------------------------------------------------------------------------------------------
     async flush() {
         if (!this.isActive) {
-            throw new errors_1.ConnectionError('Cannot flush session: session has already been closed');
+            throw new errors_1.SessionError('Cannot flush session: session has already been closed');
         }
         else if (this.isReadOnly) {
-            throw new errors_1.ConnectionError('Cannot flush session: session is read-only');
+            throw new errors_1.SessionError('Cannot flush session: session is read-only');
         }
         // build a list of sync queries
         const queries = this.store.getSyncQueries();
@@ -136,10 +136,10 @@ class DaoSession {
     }
     async close(action) {
         if (!this.isActive) {
-            throw new errors_1.ConnectionError('Cannot close session: session has already been closed');
+            throw new errors_1.SessionError('Cannot close session: session has already been closed');
         }
         else if (action !== 'commit' && action !== 'rollback') {
-            throw new errors_1.ConnectionError(`Cannot close session: '${action}' action is invalid`);
+            throw new TypeError(`Cannot close session: '${action}' action is invalid`);
         }
         if (!this.inTransaction) {
             this.state = 5 /* closed */;
@@ -156,7 +156,7 @@ class DaoSession {
                     const queries = this.store.getSyncQueries();
                     if (queries.length > 0) {
                         if (this.isReadOnly)
-                            throw new errors_1.ConnectionError('Dirty models detected in read-only session');
+                            throw new errors_1.SessionError('Dirty models detected in read-only session');
                         for (let query of queries) {
                             flushPromises.push(this.execute(query));
                         }
@@ -181,7 +181,7 @@ class DaoSession {
             this.store.applyChanges();
         }
         catch (error) {
-            closeError = new errors_1.ConnectionError(`Error while closing session`, error);
+            closeError = new errors_1.SessionError(`Error while closing session`, error);
         }
         this.releaseClient(closeError);
         if (closeError)
@@ -189,7 +189,7 @@ class DaoSession {
     }
     async execute(query) {
         if (!this.isActive) {
-            throw new errors_1.ConnectionError('Cannot execute a query: session is closed');
+            throw new errors_1.SessionError('Cannot execute a query: session is closed');
         }
         let firstCommand;
         // make sure sessions starts out with BEGIN statement

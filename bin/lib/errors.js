@@ -16,6 +16,17 @@ class ConnectionError extends core_1.Exception {
     }
 }
 exports.ConnectionError = ConnectionError;
+class SessionError extends core_1.Exception {
+    constructor(messageOrCause, cause) {
+        if (typeof messageOrCause === 'string') {
+            super({ name: 'Session Error', message: messageOrCause, cause });
+        }
+        else {
+            super({ name: 'Session Error', cause: messageOrCause });
+        }
+    }
+}
+exports.SessionError = SessionError;
 class QueryError extends core_1.Exception {
     constructor(messageOrCause, cause) {
         if (typeof messageOrCause === 'string') {
