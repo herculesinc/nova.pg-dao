@@ -114,18 +114,18 @@ class Token extends Model {
         }
     ]).text);
 
-})();
+});
 
 // DATABASE TESTS
 // ================================================================================================
 const database = new Database({
     connection: {
-        database    : "",
-        host        : "",
+        database    : "credotest",
+        host        : "credo-dev.postgres.database.azure.com",
         port        : 5432,
         ssl         : true,
-        user        : "",
-        password    : ""
+        user        : "credoapi@credo-dev",
+        password    : "H)!C4$PbEd5K"
     }
 });
 
@@ -151,11 +151,11 @@ const database = new Database({
         console.log(JSON.stringify(token));
         
         await session.close('commit');
+
+        await database.close();
+        console.log('Pool size: ' + database.getPoolState().size);
     }
     catch (error) {
         console.error(error);
     }
-
-    const guidGenerator = new GuidGenerator();
-    console.log(await guidGenerator.getNextId());
-});
+})();

@@ -1,4 +1,4 @@
-import * as chai from 'chai';
+﻿import * as chai from 'chai';
 import * as sinon from 'sinon';
 import * as chaiAsPromised from 'chai-as-promised';
 
@@ -28,7 +28,7 @@ const idHandler: QueryHandler = {
     parse: (row: any[]): any => row[0]
 };
 
-describe.only('NOVA.PG-DAO -> Session;', () => {
+describe('NOVA.PG-DAO -> Session;', () => {
     describe('Query tests;', () => {
         beforeEach(async () => {
             db = new Database(settings);
@@ -292,29 +292,62 @@ describe.only('NOVA.PG-DAO -> Session;', () => {
             db = new Database(settings);
         });
 
+        it('Executing queries should add connections to the pool', async () => {
+            poolState = db.getPoolState();
+
+            expect(poolState.size).to.equal(0);
+            expect(poolState.idle).to.equal(0);
+
+            const session1 = db.getSession(options, logger);
+            const session2 = db.getSession(options, logger);
+            poolState = db.getPoolState();
+
+            expect(poolState.size).to.equal(0);
+            expect(poolState.idle).to.equal(0);
+
+            await prepareDatabase(session1);
+            poolState = db.getPoolState();
+
+            expect(poolState.size).to.equal(1);
+            expect(poolState.idle).to.equal(0);
+
+            await prepareDatabase(session2);
+            poolState = db.getPoolState();
+
+            expect(poolState.size).to.equal(2);
+            expect(poolState.idle).to.equal(0);
+
+            await session1.close('commit');
+            await session2.close('commit');
+        });
+
         it('Closing a session should return a connection back to the pool', async () => {
             poolState = db.getPoolState();
 
             expect(poolState.size).to.equal(0);
             expect(poolState.idle).to.equal(0);
 
-            session = db.getSession(options, logger);
+            const session1 = db.getSession(options, logger);
+            const session2 = db.getSession(options, logger);
+
+            await prepareDatabase(session1);
+            await prepareDatabase(session2);
             poolState = db.getPoolState();
 
-            expect(poolState.size).to.equal(0);
+            expect(poolState.size).to.equal(2);
             expect(poolState.idle).to.equal(0);
 
-            await prepareDatabase(session);
+            await session1.close('commit');
             poolState = db.getPoolState();
 
-            expect(poolState.size).to.equal(1);
-            expect(poolState.idle).to.equal(0);
-
-            await session.close('commit');
-            poolState = db.getPoolState();
-
-            expect(poolState.size).to.equal(1);
+            expect(poolState.size).to.equal(2);
             expect(poolState.idle).to.equal(1);
+
+            await session2.close('commit');
+            poolState = db.getPoolState();
+
+            expect(poolState.size).to.equal(2);
+            expect(poolState.idle).to.equal(2);
         });
 
         it('Committing a transaction should update the data in the database', async () => {
@@ -1040,110 +1073,136 @@ describe.only('NOVA.PG-DAO -> Session;', () => {
     describe('Error condition tests;', () => {
         beforeEach(async () => {
             db = new Database(settings);
-            session = db.getSession(options, logger);
-
-            await prepareDatabase(session);
         });
 
-        afterEach(async () => {
-            if ( session && session.isActive) {
-                await session.close('rollback');
-            }
-        });
+        describe('Connection errors', async() => {
 
-        it('Attempt to connect to a non-existing database should throw an error', async () => {
-            const settings1 = JSON.parse(JSON.stringify(settings));
+            beforeEach(async () => {
+                session = db.getSession(options, logger);
+                await prepareDatabase(session);
+            });
 
-            settings1.connection.database = 'invalid';
-            settings1.connection.port = 1234;
-
-            const database = new Database(settings1);
-            const eSession = database.getSession(options, logger);
-
-            const query = Query.from('DROP TABLE IF EXISTS tmp_users;');
-
-            await expect(eSession.execute(query)).to.eventually.be.rejectedWith(ConnectionError, 'connect ECONNREFUSED');
-
-            expect(db.getPoolState().size).to.equal(1);
-            expect(db.getPoolState().idle).to.equal(0);
-
-            expect(session.isActive).to.to.be.true;
-        });
-
-        it('Executing a query with undefined text should throw an error but keep session active', async () => {
-            const query: any = {
-                text: undefined
-            };
-
-            await expect(session.execute(query)).to.eventually.be.rejectedWith(QueryError, 'Query text must be a string');
-
-            expect(db.getPoolState().size).to.equal(1);
-            expect(db.getPoolState().idle).to.equal(0);
-
-            expect(session.isActive).to.to.be.true;
-        });
-
-        it('Executing a query after committing a transaction should throw an error', async () => {
-            await session.close('commit');
-
-            expect(session.isActive).to.be.false;
-
-            const query = Query.from('DROP TABLE IF EXISTS tmp_users;');
-
-            await expect(session.execute(query)).to.eventually.be.rejectedWith(SessionError, 'Cannot execute a query: session is closed');
-
-            expect(db.getPoolState().size).to.equal(1);
-            expect(db.getPoolState().idle).to.equal(1);
-        });
-
-        it('Executing a query after rolling back a transaction should throw an error', async () => {
-            await session.close('rollback');
-
-            expect(session.isActive).to.be.false;
-
-            const query = Query.from('DROP TABLE IF EXISTS tmp_users;');
-
-            await expect(session.execute(query)).to.eventually.be.rejectedWith(SessionError, 'Cannot execute a query: session is closed');
-
-            expect(db.getPoolState().size).to.equal(1);
-            expect(db.getPoolState().idle).to.equal(1);
-        });
-
-        it('Executing a query with invalid SQL should throw an error but keep session active', async () => {
-            const query = Query.from('SELLECT * FROM tmp_users;');
-
-            await expect(session.execute(query)).to.eventually.be.rejectedWith(QueryError, `syntax error at or near "SELLECT"`);
-
-            expect(db.getPoolState().size).to.equal(1);
-            expect(db.getPoolState().idle).to.equal(0);
-
-            expect(session.isActive).to.to.be.true;
-        });
-
-        it('Executing a query with invalid result parser should throw an error', async () => {
-            const query = Query.from('SELECT * FROM tmp_users WHERE id = 1;', 'error', {
-                mask: 'list',
-                handler: {
-                    parse: () => {
-                        throw new Error('Parsing error')
-                    }
+            afterEach(async () => {
+                if (session && session.isActive) {
+                    await session.close('rollback');
                 }
             });
 
-            await expect(session.execute(query)).to.eventually.be.rejectedWith(ParseError, 'Failed to parse results');
+            it('Attempt to connect to a non-existing database should throw an error', async () => {
+                const settings1 = JSON.parse(JSON.stringify(settings));
+    
+                settings1.connection.database = 'invalid';
+                settings1.connection.port = 1234;
+    
+                const database = new Database(settings1);
+                const eSession = database.getSession(options, logger);
+    
+                const query = Query.from('DROP TABLE IF EXISTS tmp_users;');
+    
+                await expect(eSession.execute(query)).to.eventually.be.rejectedWith(ConnectionError, 'connect ECONNREFUSED');
+    
+                expect(db.getPoolState().size).to.equal(1);
+                expect(db.getPoolState().idle).to.equal(0);
+    
+                expect(session.isActive).to.to.be.true;
+            });
 
-            expect(db.getPoolState().size).to.equal(1);
-            expect(db.getPoolState().idle).to.equal(0);
-
-            expect(session.isActive).to.to.be.true;
         });
 
-        describe('Trying to update/create/delete models in a read-only session should throw errors', async () => {
+        describe('Query execution errors', async() => {
+
+            beforeEach(async () => {
+                session = db.getSession(options, logger);
+                await prepareDatabase(session);
+                await session.close('commit');
+                session = db.getSession(options, logger);
+            });
+
+            afterEach(async () => {
+                if (session && session.isActive) {
+                    await session.close('rollback');
+                }
+            });
+
+            it('Executing a query with undefined text should throw an error but keep session active', async () => {
+                const query: any = {
+                    text: undefined
+                };
+    
+                await expect(session.execute(query)).to.eventually.be.rejectedWith(QueryError, 'Query text must be a string');
+    
+                // failed query didn't create a new connection
+                expect(db.getPoolState().size).to.equal(1);
+                expect(db.getPoolState().idle).to.equal(1);
+    
+                expect(session.isActive).to.to.be.true;
+            });
+    
+            it('Executing a query after committing a transaction should throw an error', async () => {
+                await session.close('commit');
+    
+                expect(session.isActive).to.be.false;
+    
+                const query = Query.from('DROP TABLE IF EXISTS tmp_users;');
+    
+                await expect(session.execute(query)).to.eventually.be.rejectedWith(SessionError, 'Cannot execute a query: session is closed');
+    
+                expect(db.getPoolState().size).to.equal(1);
+                expect(db.getPoolState().idle).to.equal(1);
+            });
+    
+            it('Executing a query after rolling back a transaction should throw an error', async () => {
+                await session.close('rollback');
+    
+                expect(session.isActive).to.be.false;
+    
+                const query = Query.from('DROP TABLE IF EXISTS tmp_users;');
+    
+                await expect(session.execute(query)).to.eventually.be.rejectedWith(SessionError, 'Cannot execute a query: session is closed');
+    
+                expect(db.getPoolState().size).to.equal(1);
+                expect(db.getPoolState().idle).to.equal(1);
+            });
+    
+            it('Executing a query with invalid SQL should throw an error but keep session active', async () => {
+                const query = Query.from('SELLECT * FROM tmp_users;');
+    
+                await expect(session.execute(query)).to.eventually.be.rejectedWith(QueryError, `syntax error at or near "SELLECT"`);
+    
+                expect(db.getPoolState().size).to.equal(1);
+                expect(db.getPoolState().idle).to.equal(0);
+    
+                expect(session.isActive).to.to.be.true;
+            });
+    
+            it('Executing a query with invalid result parser should throw an error', async () => {
+                const query = Query.from('SELECT * FROM tmp_users WHERE id = 1;', 'error', {
+                    mask: 'list',
+                    handler: {
+                        parse: () => {
+                            throw new Error('Parsing error')
+                        }
+                    }
+                });
+    
+                await expect(session.execute(query)).to.eventually.be.rejectedWith(ParseError, 'Failed to parse results');
+    
+                expect(db.getPoolState().size).to.equal(1);
+                expect(db.getPoolState().idle).to.equal(0);
+    
+                expect(session.isActive).to.to.be.true;
+            });
+        });
+
+        describe('Read-only session errors', async () => {
             let UserModel: any;
 
             const readOnlyOpts = {...options, readonly: true};
 
             beforeEach(async () => {
+                session = db.getSession(options, logger);
+                await prepareDatabase(session);
+                await session.close('commit');
                 session = db.getSession(readOnlyOpts, logger);
 
                 @dbModel('tmp_users', new PgIdGenerator('tmp_users_id_seq'))
@@ -1160,7 +1219,7 @@ describe.only('NOVA.PG-DAO -> Session;', () => {
 
             afterEach(async () => {
                 if (session && session.isActive) {
-                    await session.close('commit');
+                    await session.close('rollback');
                 }
             });
 
@@ -1189,6 +1248,11 @@ describe.only('NOVA.PG-DAO -> Session;', () => {
             const readOnlyOpts = {...options, readonly: true};
 
             beforeEach(async () => {
+                session = db.getSession(options, logger);
+                await prepareDatabase(session);
+                await session.close('commit');
+                session = db.getSession(options, logger);
+
                 @dbModel('tmp_users', new PgIdGenerator('tmp_users_id_seq'))
                 class UModel extends Model {
                     @dbField(String)
@@ -1202,8 +1266,8 @@ describe.only('NOVA.PG-DAO -> Session;', () => {
             });
 
             afterEach(async () => {
-                if ( session && session.isActive) {
-                    await session.close('commit');
+                if (session && session.isActive) {
+                    await session.close('rollback');
                 }
             });
 
@@ -1260,8 +1324,8 @@ describe.only('NOVA.PG-DAO -> Session;', () => {
                 });
 
                 afterEach(async () => {
-                    if ( session && session.isActive) {
-                        await session.close('commit');
+                    if (session && session.isActive) {
+                        await session.close('rollback');
                     }
                 });
 
@@ -1278,6 +1342,11 @@ describe.only('NOVA.PG-DAO -> Session;', () => {
             let UserModel: any;
 
             beforeEach(async () => {
+                session = db.getSession(options, logger);
+                await prepareDatabase(session);
+                await session.close('commit');
+                session = db.getSession(options, logger);
+
                 @dbModel('tmp_users', new PgIdGenerator('tmp_users_id_seq'))
                 class UModel extends Model {
                     @dbField(String)
@@ -1291,16 +1360,12 @@ describe.only('NOVA.PG-DAO -> Session;', () => {
             });
 
             afterEach(async () => {
-                if ( session && session.isActive) {
-                    await session.close('commit');
+                if (session && session.isActive) {
+                    await session.close('rollback');
                 }
             });
 
             it('Reloading a dirty model should throw an error', async () => {
-                
-                await prepareDatabase(session);
-                await session.close('commit');
-
                 session = db.getSession(options, logger);
 
                 const user = await session.fetchOne(UserModel, { id: '1' }, true);
@@ -1310,7 +1375,7 @@ describe.only('NOVA.PG-DAO -> Session;', () => {
             });
         });
 
-        describe('custom model handlers errors', () => {
+        describe('custom model handler errors', () => {
             let customHandler: FieldHandler;
             let UserModel: any;
 
@@ -1318,7 +1383,10 @@ describe.only('NOVA.PG-DAO -> Session;', () => {
             const idGenerator = new PgIdGenerator(`${table}_id_seq`);
 
             beforeEach(async () => {
+                session = db.getSession(options, logger);
+                await prepareDatabase(session);
                 await session.close('commit');
+                session = db.getSession(options, logger);
 
                 customHandler = {
                     parse    : (value: string): string[] => JSON.parse(value),
@@ -1326,8 +1394,12 @@ describe.only('NOVA.PG-DAO -> Session;', () => {
                     clone    : (value: string[]): string[] => value,
                     areEqual : (value1: string, value2: string): boolean => value1 !== value2
                 };
+            });
 
-                session = db.getSession(options, logger);
+            afterEach(async () => {
+                if (session && session.isActive) {
+                    await session.close('rollback');
+                }
             });
 
             describe('when parse() handler throws error', () => {
