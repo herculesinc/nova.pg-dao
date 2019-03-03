@@ -1,7 +1,6 @@
 ﻿// IMPORTS
 // ================================================================================================
-import { ListResultQuery, SingleResultQuery } from '@nova/pg-dao';
-import { DaoSession } from '../lib/Session';
+import { DaoSession, ListResultQuery, SingleResultQuery } from '@nova/pg-dao';
 
 // INTERFACES
 // ================================================================================================

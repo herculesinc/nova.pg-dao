@@ -6,22 +6,12 @@ chai.use(chaiAsPromised);
 
 const expect = chai.expect;
 
-import { Database, Model } from './../index';
-import {
-    SessionOptions,
-    PoolState,
-    QueryHandler,
-    FieldHandler,
-    Serializer,
-    Parser,
-    Comparator,
-    Cloner
-} from '@nova/pg-dao';
-import { dbField, dbModel, PgIdGenerator, Query, Operators } from '../index';
-import { DaoSession } from '../lib/Session';
+import { Database, Model, dbField, dbModel, PgIdGenerator, Query, Operators } from './../index';
+import { DaoSession, SessionOptions, PoolState, QueryHandler, FieldHandler } from '@nova/pg-dao';
 import { User, prepareDatabase } from './setup';
 import { settings } from './settings';
 import { MockLogger } from './mocks/Logger';
+import { QueryError, ConnectionError, ParseError } from '../lib/errors';
 
 let db: Database;
 let session: DaoSession;
@@ -38,7 +28,7 @@ const idHandler: QueryHandler = {
     parse: (row: any[]): any => row[0]
 };
 
-describe('NOVA.PG-DAO -> Session;', () => {
+describe.only('NOVA.PG-DAO -> Session;', () => {
     describe('Query tests;', () => {
         beforeEach(async () => {
             db = new Database(settings);
@@ -789,7 +779,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
                 await session.flush();
 
-                expect(updated.updatedOn).to.not.equal(originUpdateOn);
+                expect(updated.updatedOn).to.be.greaterThan(originUpdateOn);
             });
 
             it('db should be updated after flush() method', async () => {
@@ -994,7 +984,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
         });
     });
 
-    describe('Error condition tests;', () => {
+    describe.only('Error condition tests;', () => {
         beforeEach(async () => {
             db = new Database(settings);
             session = db.getSession(options, logger);
@@ -1002,20 +992,19 @@ describe('NOVA.PG-DAO -> Session;', () => {
             await prepareDatabase(session);
         });
 
-        // todo  uncomment after fixing
-        // afterEach(async () => {
-        //     if ( session && session.isActive) {
-        //         await session.close('rollback');
-        //     }
-        // });
+        afterEach(async () => {
+            if ( session && session.isActive) {
+                await session.close('rollback');
+            }
+        });
 
-        it('Query execution error should close the session and release the connection back to the pool', async () => {
+        it('Executing a query with missing text should throw an error but keep session active', async () => {
             const query: any = {
                 text: undefined
             };
 
             await expect(session.execute(query)).to.eventually
-                .be.rejectedWith(Error, 'Query text must be a string');
+                .be.rejectedWith(TypeError, 'Query text must be a string');
 
             expect(db.getPoolState().size).to.equal(1);
             expect(db.getPoolState().idle).to.equal(0);
@@ -1030,7 +1019,8 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
             const query = Query.from('DROP TABLE IF EXISTS tmp_users;');
 
-            await expect(session.execute(query)).to.eventually.be.rejectedWith(Error, 'Cannot execute a query: session is closed');
+            await expect(session.execute(query)).to.eventually
+                .be.rejectedWith(ConnectionError, 'Cannot execute a query: session is closed');
 
             expect(db.getPoolState().size).to.equal(1);
             expect(db.getPoolState().idle).to.equal(1);
@@ -1049,10 +1039,11 @@ describe('NOVA.PG-DAO -> Session;', () => {
             expect(db.getPoolState().idle).to.equal(1);
         });
 
-        it('Executing a query with invalid SQL should throw an error', async () => {
+        it('Executing a query with invalid SQL should throw an error but keep session active', async () => {
             const query = Query.from('SELLECT * FROM tmp_users;');
 
-            await expect(session.execute(query)).to.eventually.be.rejectedWith(Error, 'syntax error at');
+            await expect(session.execute(query)).to.eventually
+                .be.rejectedWith(QueryError, `syntax error at or near "SELLECT"`);
 
             expect(db.getPoolState().size).to.equal(1);
             expect(db.getPoolState().idle).to.equal(0);
@@ -1070,7 +1061,8 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 }
             });
 
-            await expect(session.execute(query)).to.eventually.be.rejectedWith(Error, 'Failed to parse results');
+            await expect(session.execute(query)).to.eventually
+                .be.rejectedWith(ParseError, 'Failed to parse results');
 
             expect(db.getPoolState().size).to.equal(1);
             expect(db.getPoolState().idle).to.equal(0);
@@ -1089,7 +1081,8 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
             const query = Query.from('DROP TABLE IF EXISTS tmp_users;');
 
-            await expect(eSession.execute(query)).to.eventually.be.rejectedWith(Error, 'connect ECONNREFUSED');
+            await expect(eSession.execute(query)).to.eventually
+                .be.rejectedWith(ConnectionError, 'connect ECONNREFUSED');
 
             expect(db.getPoolState().size).to.equal(1);
             expect(db.getPoolState().idle).to.equal(0);
@@ -1124,7 +1117,8 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('fetchOne() method for update', async () => {
-                await expect(session.fetchOne(UserModel, {id: '1'}, true)).to.eventually.be.rejectedWith(Error, 'Cannot fetch mutable model: session is read-only');
+                await expect(session.fetchOne(UserModel, {id: '1'}, true)).to.eventually
+                    .be.rejectedWith(Error, 'Cannot fetch mutable model: session is read-only');
             });
 
             it('fetchAll() method for update', async () => {
@@ -1166,7 +1160,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 }
             });
 
-            it('Trying to call flush() method in a read-only session should throw errors', async () => {
+            it('Flushing a read-only session should throw error', async () => {
                 session = db.getSession(readOnlyOpts, logger);
 
                 expect(session.isActive).to.be.true;
@@ -1175,7 +1169,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 await expect(session.flush()).to.eventually.be.rejectedWith(Error, 'Cannot flush session: session is read-only');
             });
 
-            it('Trying to call flush() method in closed session should throw errors', async () => {
+            it('Flushing a closed session should throw error', async () => {
                 session = db.getSession(options, logger);
                 await session.close('commit');
 
@@ -1185,7 +1179,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 await expect(session.flush()).to.eventually.be.rejectedWith(Error, 'Cannot flush session: session has already been closed');
             });
 
-            it('Closing an already closed session should throw an error', async () => {
+            it('Closing an already closed session should throw error', async () => {
                 session = db.getSession(options, logger);
                 await session.close('commit');
 
@@ -1194,7 +1188,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 await expect(session.close('commit')).to.eventually.be.rejectedWith(Error, 'Cannot close session: session has already been closed');
             });
 
-            it('Closing read-only session with dirty models should throw an error', async () => {
+            it('Closing read-only session with dirty models should throw error', async () => {
                 session = db.getSession(options, logger);
 
                 await prepareDatabase(session);
@@ -1224,11 +1218,8 @@ describe('NOVA.PG-DAO -> Session;', () => {
                     }
                 });
 
-                [
-                    undefined, null, false, 0, '',
-                    123, 'commmmit', 'rollingback', 'roll back',
-                    ['commit']
-                ].forEach((action: any) => {
+                [ undefined, null, false, 0, '', 123, 'commmmit', ['commit'] ]
+                .forEach((action: any) => {
                     it(`for action=${JSON.stringify(action)}`, async () => {
                         await expect(session.close(action)).to.eventually.be.rejectedWith(Error, `Cannot close session: '${action}' action is invalid`);
                     });
@@ -1236,7 +1227,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
         });
 
-        describe.only('custom model handlers errors', () => {
+        describe('custom model handlers errors', () => {
             let customHandler: FieldHandler;
             let UserModel: any;
 
@@ -1257,7 +1248,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 session = db.getSession(options, logger);
             });
 
-            describe('when parse() handler throw error', () => {
+            describe('when parse() handler throws error', () => {
                 beforeEach(() => {
                     customHandler.parse = (value: string): string[] => {throw new Error(errorText);};
 
@@ -1273,16 +1264,20 @@ describe('NOVA.PG-DAO -> Session;', () => {
                     UserModel = UModel;
                 });
 
-                it('should call parse() method', async () => {
+                it('fetching a model should throw error but keep session active', async () => {
                     expect(session.isActive).to.be.true;
 
                     await expect(session.fetchOne(UserModel, {id: '1'})).to.eventually.be.rejectedWith(Error, errorText);
 
                     expect(session.isActive).to.be.true;
+
+                    const poolState = db.getPoolState();
+                    expect(poolState.size).to.be.equal(1);
+                    expect(poolState.idle).to.be.equal(0);
                 });
             });
 
-            describe('when serialize() handler throw error', () => {
+            describe('when serialize() handler throws error', () => {
                 beforeEach(() => {
                     customHandler.serialize = (value: string[]): string => {throw new Error(errorText);};
 
@@ -1298,18 +1293,40 @@ describe('NOVA.PG-DAO -> Session;', () => {
                     UserModel = UModel;
                 });
 
-                it('should call serialize() method', async () => {
+                it(`flush() should throw error but keep session active`, async () => {
                     expect(session.isActive).to.be.true;
 
-                    await session.create(UserModel, {username: 'username', tags: ['1', '2']});
+                    const user1 = await session.create(UserModel, { username: 'username', tags: ['1', '2'] });
 
-                    await expect(session.close('commit')).to.eventually.be.rejectedWith(Error, errorText);
+                    await expect(session.flush()).to.eventually.be.rejectedWith(Error, errorText);  // TODO: custom error
+
+                    expect(user1.isCreated()).to.be.true;
 
                     expect(session.isActive).to.be.true;
+                    const poolState = db.getPoolState();
+                    expect(poolState.size).to.be.equal(1);
+                    expect(poolState.idle).to.be.equal(0);
+
+                    const user2 = await session.fetchOne(UserModel, { id: user1.id });
+                    expect(user2).to.be.undefined;
+                });
+
+                it(`close('commit') should throw error and terminate connection`, async () => {
+                    expect(session.isActive).to.be.true;
+
+                    const user1 = await session.create(UserModel, {username: 'username', tags: ['1', '2']});
+
+                    await expect(session.close('commit')).to.eventually.be.rejectedWith(Error, errorText);  // TODO: custom error
+
+                    expect(session.isActive).to.be.false;
+
+                    const poolState = db.getPoolState();
+                    expect(poolState.size).to.be.equal(0);
+                    expect(poolState.idle).to.be.equal(0);
                 });
             });
 
-            describe('when clone() handler throw error', () => {
+            describe('when clone() handler throws error', () => {
                 beforeEach(() => {
                     customHandler.clone = (value: string[]): string[] => {throw new Error(errorText);};
 
@@ -1325,16 +1342,21 @@ describe('NOVA.PG-DAO -> Session;', () => {
                     UserModel = UModel;
                 });
 
-                it('should call close() method', async () => {
+                it('fetching a model should throw error but keep session active', async () => {
                     expect(session.isActive).to.be.true;
 
-                    await expect(session.fetchOne(UserModel, {id: '1'})).to.eventually.be.rejectedWith(Error, errorText);
+                    await expect(session.fetchOne(UserModel, {id: '1'})).to.eventually.be.rejectedWith(Error, errorText);   // TODO: custom error
 
                     expect(session.isActive).to.be.true;
+
+                    const poolState = db.getPoolState();
+                    expect(poolState.size).to.be.equal(1);
+                    expect(poolState.idle).to.be.equal(0);
                 });
+                
             });
 
-            describe('when areEqual() handler throw error', () => {
+            describe('when areEqual() handler throws error', () => {
                 beforeEach(() => {
                     customHandler.areEqual = (value1: string, value2: string): boolean => {throw new Error(errorText);};
 
@@ -1350,14 +1372,32 @@ describe('NOVA.PG-DAO -> Session;', () => {
                     UserModel = UModel;
                 });
 
-                it('should call areEqual() method', async () => {
+                it(`flush() should throw error but keep session active`, async () => {
                     expect(session.isActive).to.be.true;
 
                     await session.fetchOne(UserModel, {id: '1'});
 
-                    await expect(session.close('commit')).to.eventually.be.rejectedWith(Error, errorText);
+                    await expect(session.flush()).to.eventually.be.rejectedWith(Error, errorText);  // TODO: custom error
 
                     expect(session.isActive).to.be.true;
+
+                    const poolState = db.getPoolState();
+                    expect(poolState.size).to.be.equal(1);
+                    expect(poolState.idle).to.be.equal(0);
+                });
+
+                it(`close('commit') should throw error and terminate connection`, async () => {
+                    expect(session.isActive).to.be.true;
+
+                    await session.fetchOne(UserModel, {id: '1'});
+
+                    await expect(session.close('commit')).to.eventually.be.rejectedWith(Error, errorText); // TODO: custom error
+
+                    expect(session.isActive).to.be.false;
+
+                    const poolState = db.getPoolState();
+                    expect(poolState.size).to.be.equal(0);
+                    expect(poolState.idle).to.be.equal(0);
                 });
             });
             // flush
