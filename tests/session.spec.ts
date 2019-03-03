@@ -1,4 +1,4 @@
-﻿import * as chai from 'chai';
+import * as chai from 'chai';
 import * as sinon from 'sinon';
 import * as chaiAsPromised from 'chai-as-promised';
 
@@ -28,7 +28,7 @@ const idHandler: QueryHandler = {
     parse: (row: any[]): any => row[0]
 };
 
-describe('NOVA.PG-DAO -> Session;', () => {
+describe.only('NOVA.PG-DAO -> Session;', () => {
     describe('Query tests;', () => {
         beforeEach(async () => {
             db = new Database(settings);
@@ -547,13 +547,13 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 session.getOne(UserModel, '1');
             });
 
-            it('should return undefined if users is not loaded', async () => {
+            it('should return undefined if model is not loaded', async () => {
                 const user = session.getOne(UserModel, '1');
 
                 expect(user).to.be.undefined;
             });
 
-            it('should return user when users is loaded by fetchAll() method', async () => {
+            it('should return model when the model is loaded by fetchAll() method', async () => {
                 let user = session.getOne(UserModel, '1');
 
                 expect(user).to.be.undefined;
@@ -571,7 +571,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 expect(user.isModified()).to.be.false;
             });
 
-            it('should return user when users is loaded by fetchOne() method', async () => {
+            it('should return model when the model is loaded by fetchOne() method', async () => {
                 let user = session.getOne(UserModel, '1');
 
                 expect(user).to.be.undefined;
@@ -599,14 +599,14 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 session.getAll(UserModel);
             });
 
-            it('should return undefined if users is not loaded', async () => {
+            it('should return an empty map if models are not loaded', async () => {
                 const users = session.getAll(UserModel);
 
                 expect(users).to.be.empty;
                 expect(users.size).to.equal(0);
             });
 
-            it('should return user when users is loaded by fetchAll() method', async () => {
+            it('should return models when the models are loaded by fetchAll() method', async () => {
                 let users = session.getAll(UserModel);
 
                 expect(users).to.be.empty;
@@ -627,7 +627,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 });
             });
 
-            it('should return user when users is loaded by fetchOne() method', async () => {
+            it('should return model when the model is loaded by fetchOne() method', async () => {
                 let users = session.getAll(UserModel);
 
                 expect(users).to.be.empty;
@@ -1159,7 +1159,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             afterEach(async () => {
-                if ( session && session.isActive) {
+                if (session && session.isActive) {
                     await session.close('commit');
                 }
             });
