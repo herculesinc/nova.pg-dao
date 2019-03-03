@@ -121,11 +121,11 @@ class Token extends Model {
 const database = new Database({
     connection: {
         database    : "credotest",
-        host        : "credo-dev.postgres.database.azure.com",
+        host        : "",
         port        : 5432,
         ssl         : true,
         user        : "credoapi@credo-dev",
-        password    : "H)!C4$PbEd5K"
+        password    : ""
     }
 });
 

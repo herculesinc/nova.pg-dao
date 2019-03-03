@@ -5,7 +5,7 @@ export const settings = {
         port    : 5432,
         ssl     : false,
         user    : 'postgres',
-        password: 'RepT%8&G5l1I'
+        password: ''
     },
     pool: {
         maxSize         : 10,
