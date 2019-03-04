@@ -150,7 +150,7 @@ export class Model implements IModel {
         return this[symDeleted];
     }
 
-    isModified(checkReadonlyFields = true): boolean {
+    hasChanged(checkReadonlyFields = true): boolean {
         const schema = (this.constructor as typeof Model).getSchema();
         const original = this[symOriginal];
         if (!original) return false;

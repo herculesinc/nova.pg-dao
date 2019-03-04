@@ -33,7 +33,7 @@ export class DaoSession implements Dao {
     private readonly logger         : Logger;
     private readonly readonly       : boolean;
     private readonly logQueryText   : boolean;
-    private readonly checkImmutable : boolean;
+    private readonly verifyImmutability : boolean;
 
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
@@ -44,7 +44,7 @@ export class DaoSession implements Dao {
 
         this.readonly = options.readonly;
         this.logQueryText = options.logQueryText;
-        this.checkImmutable = options.checkImmutable;
+        this.verifyImmutability = options.verifyImmutability;
         this.logger = logger;
         this.store = new Store(options);
 
@@ -202,15 +202,21 @@ export class DaoSession implements Dao {
             if (action === 'commit') {
                 this.logger.debug('Committing and closing session');
 
-                // flush changes
+                // flush changes, if needed
                 const flushPromises: Promise<any>[] = [];
-                if (this.checkImmutable || !this.isReadOnly) {
+                if (!this.isReadOnly) {
+                    // if the session is not read-only, get a list of sync queries to execute
                     const queries = this.store.getSyncQueries();
                     if (queries.length > 0) {
-                        if (this.isReadOnly) throw new SessionError('Dirty models detected in read-only session');
                         for (let query of queries) {
                             flushPromises.push(this.execute(query));
                         }
+                    }
+                }
+                else if (this.verifyImmutability) {
+                    // check immutability for read-only sessions
+                    if (this.store.hasChanges())  {
+                        throw new SessionError('Dirty models detected in read-only session');
                     }
                 }
 

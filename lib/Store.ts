@@ -7,21 +7,21 @@ import { ModelError, SessionError } from './errors';
 // INTERFACES
 // ================================================================================================
 interface StoreConfig {
-    checkImmutable  : boolean;
+    verifyImmutability  : boolean;
 }
 
 // CLASS DEFINITION
 // ================================================================================================
 export class Store {
 
-    private readonly models         : Map<string, Model>;
-    private readonly checkImmutable : boolean;
+    private readonly models             : Map<string, Model>;
+    private readonly verifyImmutability : boolean;
 
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     constructor(config: StoreConfig) {
         this.models = new Map();
-        this.checkImmutable = config.checkImmutable;
+        this.verifyImmutability = config.verifyImmutability;
     }
 
     // ACCESSORS
@@ -60,15 +60,15 @@ export class Store {
             // check if the model can be reloaded
             if (model[symMutable]) {
                 if (model[symCreated]) throw new SessionError(`Cannot reload ${type.name} model: model is newly inserted`);
-                if (model.isModified()) {
+                if (model.hasChanged(this.verifyImmutability)) {
                     throw new SessionError(`Cannot reload ${type.name} model: model has been modified`);
                 }
             }
-            model.infuse(rowData, fields, this.checkImmutable);
+            model.infuse(rowData, fields, this.verifyImmutability);
         }
         else {
             let saveOriginal = SaveOriginalMethod.dontSave;
-            if (this.checkImmutable) {
+            if (this.verifyImmutability) {
                 saveOriginal = SaveOriginalMethod.saveAllFields;
             }
             else if (mutable) {
@@ -95,7 +95,7 @@ export class Store {
             model[symCreated] = true;
         }
         else {
-            model.saveOriginal(this.checkImmutable);
+            model.saveOriginal(this.verifyImmutability);
         }
 
         this.models.set(uid, model);
@@ -129,7 +129,7 @@ export class Store {
         let queries: Query[] = [];
         const updatedOn = Date.now();
 
-        if (this.checkImmutable) {
+        if (this.verifyImmutability) {
             // iterate through models and check every model for changes
             for (let model of this.models.values()) {
                 const mQueries = model.getSyncQueries(updatedOn, true);
@@ -162,6 +162,15 @@ export class Store {
         return queries;
     }
 
+    hasChanges(): boolean {
+        for (let model of this.models.values()) {
+            if (model[symDeleted]) return true;
+            if (model[symCreated]) return true;
+            if (model.hasChanged(this.verifyImmutability)) return true;
+        }
+        return false;
+    }
+
     applyChanges() {
 
         for (let model of this.models.values()) {
@@ -175,10 +184,10 @@ export class Store {
             }
             else if (model[symCreated]) {
                 model[symCreated] = false;
-                model.saveOriginal(this.checkImmutable);
+                model.saveOriginal(this.verifyImmutability);
             }
             else {
-                model.saveOriginal(this.checkImmutable);
+                model.saveOriginal(this.verifyImmutability);
             }
         }
 

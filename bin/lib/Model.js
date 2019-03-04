@@ -119,7 +119,7 @@ class Model {
     isDeleted() {
         return this[exports.symDeleted];
     }
-    isModified(checkReadonlyFields = true) {
+    hasChanged(checkReadonlyFields = true) {
         const schema = this.constructor.getSchema();
         const original = this[symOriginal];
         if (!original)

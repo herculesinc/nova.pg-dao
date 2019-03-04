@@ -24,9 +24,9 @@ export const defaults: Defaults = {
         database        : undefined,
     },
     session: {
-        readonly        : true,
-        checkImmutable  : true,
-        logQueryText    : false
+        readonly            : true,
+        verifyImmutability  : true,
+        logQueryText        : false
     },
     pool: {
         maxSize         : 20,

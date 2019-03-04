@@ -37,9 +37,9 @@ declare module "@nova/pg-dao" {
     }
 
     export interface SessionOptions {
-        readonly        : boolean;
-        checkImmutable  : boolean;  // TODO: rename to enforceImmutablity?
-        logQueryText    : boolean;  // TODO: change to log level
+        readonly            : boolean;
+        verifyImmutability  : boolean;  // TODO: rename to enforceImmutablity?
+        logQueryText        : boolean;  // TODO: change to log level
     }
 
     export class Database extends EventEmitter {
@@ -278,7 +278,7 @@ declare module "@nova/pg-dao" {
         isCreated(): boolean;
         isDeleted(): boolean;
 
-        isModified(checkReadonlyFields?: boolean): boolean;
+        hasChanged(checkReadonlyFields?: boolean): boolean;
 
         static SelectQuery<T extends typeof Model>(this: T, mask: 'list'): SelectAllModelsQuery<InstanceType<T>>;
         static SelectQuery<T extends typeof Model>(this: T, mask: 'single'): SelectOneModelQuery<InstanceType<T>>;

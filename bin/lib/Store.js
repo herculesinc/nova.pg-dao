@@ -9,7 +9,7 @@ class Store {
     // --------------------------------------------------------------------------------------------
     constructor(config) {
         this.models = new Map();
-        this.checkImmutable = config.checkImmutable;
+        this.verifyImmutability = config.verifyImmutability;
     }
     // ACCESSORS
     // --------------------------------------------------------------------------------------------
@@ -47,15 +47,15 @@ class Store {
             if (model[Model_1.symMutable]) {
                 if (model[Model_1.symCreated])
                     throw new errors_1.SessionError(`Cannot reload ${type.name} model: model is newly inserted`);
-                if (model.isModified()) {
+                if (model.hasChanged(this.verifyImmutability)) {
                     throw new errors_1.SessionError(`Cannot reload ${type.name} model: model has been modified`);
                 }
             }
-            model.infuse(rowData, fields, this.checkImmutable);
+            model.infuse(rowData, fields, this.verifyImmutability);
         }
         else {
             let saveOriginal = 0 /* dontSave */;
-            if (this.checkImmutable) {
+            if (this.verifyImmutability) {
                 saveOriginal = 2 /* saveAllFields */;
             }
             else if (mutable) {
@@ -79,7 +79,7 @@ class Store {
             model[Model_1.symCreated] = true;
         }
         else {
-            model.saveOriginal(this.checkImmutable);
+            model.saveOriginal(this.verifyImmutability);
         }
         this.models.set(uid, model);
         return model;
@@ -108,7 +108,7 @@ class Store {
     getSyncQueries() {
         let queries = [];
         const updatedOn = Date.now();
-        if (this.checkImmutable) {
+        if (this.verifyImmutability) {
             // iterate through models and check every model for changes
             for (let model of this.models.values()) {
                 const mQueries = model.getSyncQueries(updatedOn, true);
@@ -142,6 +142,17 @@ class Store {
         }
         return queries;
     }
+    hasChanges() {
+        for (let model of this.models.values()) {
+            if (model[Model_1.symDeleted])
+                return true;
+            if (model[Model_1.symCreated])
+                return true;
+            if (model.hasChanged(this.verifyImmutability))
+                return true;
+        }
+        return false;
+    }
     applyChanges() {
         for (let model of this.models.values()) {
             if (!model[Model_1.symMutable])
@@ -154,10 +165,10 @@ class Store {
             }
             else if (model[Model_1.symCreated]) {
                 model[Model_1.symCreated] = false;
-                model.saveOriginal(this.checkImmutable);
+                model.saveOriginal(this.verifyImmutability);
             }
             else {
-                model.saveOriginal(this.checkImmutable);
+                model.saveOriginal(this.verifyImmutability);
             }
         }
     }
