@@ -1,6 +1,7 @@
 // IMPORTS
 // ================================================================================================
 import { QueryMask, QueryHandler, ResultHandler } from '@nova/pg-dao';
+import { FieldDescription } from 'pg';
 import { isModelClass } from '../Model';
 import { Store } from '../Store';
 import { ArrayResult } from './ArrayResult';
@@ -23,16 +24,6 @@ export interface Result {
     complete(command: string, rows: number): void;
 
     end(error?: Error): void;
-}
-
-export interface FieldDescription {
-    name            : string;
-    tableID         : number;
-    columnID        : number;
-    dataTypeID      : number;
-    dataTypeSize    : number;
-    dataTypeModifier: number;
-    format          : string;
 }
 
 interface ResultOptions {

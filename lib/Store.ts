@@ -1,6 +1,6 @@
 // IMPORTS
 // ================================================================================================
-import { Query, FieldDescriptor } from '@nova/pg-dao';
+import { Query, FieldDescriptor, SaveOriginalMethod } from '@nova/pg-dao';
 import { Model, symMutable, symCreated, symDeleted, getModelClass, isModelClass } from './Model';
 import { ModelError, SessionError } from './errors';
 
@@ -26,7 +26,7 @@ export class Store {
 
     // ACCESSORS
     // --------------------------------------------------------------------------------------------
-    get<T extends Model>(type: typeof Model, id: string): T | undefined {
+    getOne<T extends Model>(type: typeof Model, id: string): T | undefined {
         if (!isModelClass(type)) throw new TypeError('Cannot get model: model type is invalid');
         if (typeof id !== 'string') throw new TypeError('Cannot get model: model id is invalid');
 
@@ -64,10 +64,18 @@ export class Store {
                     throw new SessionError(`Cannot reload ${type.name} model: model has been modified`);
                 }
             }
-            model.infuse(rowData, fields);
+            model.infuse(rowData, fields, this.checkImmutable);
         }
         else {
-            model = new type(rowData, fields);
+            let saveOriginal = SaveOriginalMethod.dontSave;
+            if (this.checkImmutable) {
+                saveOriginal = SaveOriginalMethod.saveAllFields;
+            }
+            else if (mutable) {
+                saveOriginal = SaveOriginalMethod.saveMutableFields;
+            }
+
+            model = new type(rowData, fields, saveOriginal);
             this.models.set(uid, model);
         }
         model[symMutable] = mutable;
@@ -87,8 +95,7 @@ export class Store {
             model[symCreated] = true;
         }
         else {
-            // TODO: make based on config
-            model.saveOriginal(true);
+            model.saveOriginal(this.checkImmutable);
         }
 
         this.models.set(uid, model);
@@ -125,7 +132,7 @@ export class Store {
         if (this.checkImmutable) {
             // iterate through models and check every model for changes
             for (let model of this.models.values()) {
-                const mQueries = model.getSyncQueries(updatedOn);
+                const mQueries = model.getSyncQueries(updatedOn, true);
                 if (!mQueries) continue;
                 if (mQueries.length === 1) {
                     queries.push(mQueries[0]);
@@ -139,7 +146,7 @@ export class Store {
             // check only mutable models for changes
             for (let model of this.models.values()) {
                 if (!model[symMutable]) continue;
-                const mQueries = model.getSyncQueries(updatedOn);
+                const mQueries = model.getSyncQueries(updatedOn, false);
                 if (!mQueries) continue;
                 if (mQueries.length > 0) {
                     if (mQueries.length === 1) {
@@ -166,10 +173,12 @@ export class Store {
                 this.models.delete(uid);
                 model.clearOriginal();
             }
-            else {
-                // TODO: make based on config
-                model.saveOriginal(true);
+            else if (model[symCreated]) {
                 model[symCreated] = false;
+                model.saveOriginal(this.checkImmutable);
+            }
+            else {
+                model.saveOriginal(this.checkImmutable);
             }
         }
 

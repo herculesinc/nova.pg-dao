@@ -43,10 +43,10 @@ declare module "pg" {
     }
 
     export interface QueryResult {
-        command: string;
+        command : string;
         rowCount: number;
-        oid: number;
-        rows: any[];
+        oid     : number;
+        rows    : any[];
     }
 
     export interface ResultBuilder extends QueryResult {
@@ -113,5 +113,64 @@ declare module "pg" {
     namespace types {
         function setTypeParser<T>(typeId: number, parser: (value: string) => T): void;
         function getTypeParser<T>(oid: number, format: string): (value: string) => T;
+    }
+
+    export interface Connection {
+
+        query(text: string): void;
+    
+        parse(query: { name?: string; text: string; types?: any[]; }, more: boolean): void;
+        bind(config: { portal?: string; statement?: string; binary?: boolean; values: any[]; }, more: boolean): void;
+        describe(msg: { type: string; name?: string; }, more: boolean): void;
+        execute(config: { portal?: string; rows: number; }, more: boolean): void;
+    
+        flush(): void;
+        sync(): void;
+    }
+
+    export interface Submittable {
+        submit(connection: Connection): void;
+        
+        handleRowDescription(message: RowDescription): void;
+        handleDataRow(message: DataRow): void;
+        handleCommandComplete(message: CommandComplete, connection: Connection): void;
+    
+        handleReadyForQuery(connection: Connection): void;
+        handleEmptyQuery(connection: Connection): void;
+        handleError(error: Error, connection: Connection): void;
+    
+        handlePortalSuspended(connection: Connection): void;
+        handleCopyInResponse(connection: Connection): void;
+        handleCopyData(message: any, connection: Connection): void;
+    }
+
+    export interface RowDescription {
+        name        : 'rowDescription';
+        length      : number;
+        fieldCount  : number;
+        fields      : FieldDescription[];
+    }
+    
+    export interface FieldDescription {
+        name            : string;
+        tableID         : number;
+        columnID        : number;
+        dataTypeID      : number;
+        dataTypeSize    : number;
+        dataTypeModifier: number;
+        format          : string;
+    }
+    
+    export interface DataRow {
+        name            : 'dataRow';
+        length          : number;
+        fieldCount      : number;
+        fields          : string[];
+    }
+    
+    export interface CommandComplete {
+        name            : 'commandComplete';
+        length          : number;
+        text            : string;
     }
 }

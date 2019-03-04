@@ -38,7 +38,7 @@ declare module "@nova/pg-dao" {
 
     export interface SessionOptions {
         readonly        : boolean;
-        checkImmutable  : boolean;
+        checkImmutable  : boolean;  // TODO: rename to enforceImmutablity?
         logQueryText    : boolean;  // TODO: change to log level
     }
 
@@ -265,25 +265,30 @@ declare module "@nova/pg-dao" {
     export class Model {
 
         constructor(seed: object, deepCopy?: boolean);
-        constructor(rowData: string[], fields: FieldDescriptor[]);
+        constructor(rowData: string[], fields: FieldDescriptor[], saveOriginal: SaveOriginalMethod);
 
         readonly id         : string;
         readonly createdOn  : number;
         readonly updatedOn  : number;
 
-        infuse(rowData: string[], fields: FieldDescriptor[]): void;
-        getSyncQueries(updatedOn: number): Query[] | undefined;
+        infuse(rowData: string[], fields: FieldDescriptor[], cloneReadonlyFields?: boolean): void;
+        getSyncQueries(updatedOn: number, checkReadonlyFields?: boolean): Query[] | undefined;
 
         isMutable(): boolean;
         isCreated(): boolean;
         isDeleted(): boolean;
-        isModified(): boolean;
+
+        isModified(checkReadonlyFields?: boolean): boolean;
 
         static SelectQuery<T extends typeof Model>(this: T, mask: 'list'): SelectAllModelsQuery<InstanceType<T>>;
         static SelectQuery<T extends typeof Model>(this: T, mask: 'single'): SelectOneModelQuery<InstanceType<T>>;
 
         static setSchema(table: string, idGenerator: IdGenerator, fields: FieldMap): DbSchema;
         static getSchema(): DbSchema;
+    }
+
+    export const enum SaveOriginalMethod {
+        dontSave = 0, saveMutableFields = 1, saveAllFields = 2
     }
 
     export interface SelectOneModelQuery<T=any> {

@@ -1,10 +1,10 @@
 // IMPORTS
 // ================================================================================================
-import { types } from 'pg';
+import { types, FieldDescription } from 'pg';
 import { QueryMask, FieldDescriptor } from '@nova/pg-dao';
 import { Model } from '../Model';
 import { Store } from '../Store';
-import { Result, FieldDescription } from './index';
+import { Result } from './index';
 
 // MODULE VARIABLES
 // ================================================================================================

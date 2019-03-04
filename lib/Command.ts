@@ -1,6 +1,7 @@
 // IMPORTS
 // ================================================================================================
 import { Logger, TraceSource, TraceCommand, Exception } from '@nova/core';
+import { Submittable, Connection, RowDescription, DataRow, CommandComplete } from 'pg';
 import { Result, createResult } from './results';
 import { Query } from './Query';
 import { Store } from './Store'
@@ -14,7 +15,7 @@ const COMMAND_COMPLETE_REGEX = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/;
 
 // CLASS DEFINITION
 // ================================================================================================
-export class Command implements IQuery {
+export class Command implements Submittable {
 
     private readonly id             : string;
     private readonly store          : Store;
@@ -256,64 +257,4 @@ function parseCommandComplete(message: CommandComplete) {
     }
 
     return { command, rows };
-}
-
-// PG INTERFACES
-// ================================================================================================
-interface IQuery {
-    submit(connection: Connection): void;
-    handleRowDescription(message: RowDescription): void;
-    handleDataRow(message: DataRow): void;
-    handleCommandComplete(message: CommandComplete, connection: Connection): void;
-
-    handleReadyForQuery(connection: Connection): void;
-    handleEmptyQuery(connection: Connection): void;
-    handleError(error: Error, connection: Connection): void;
-
-    handlePortalSuspended(connection: Connection): void;
-    handleCopyInResponse(connection: Connection): void;
-    handleCopyData(message: any, connection: Connection): void;
-}
-
-interface Connection {
-
-    query(text: string): void;
-
-    parse(query: { name?: string; text: string; types?: any[]; }, more: boolean): void;
-    bind(config: { portal?: string; statement?: string; binary?: boolean; values: any[]; }, more: boolean): void;
-    describe(msg: { type: string; name?: string; }, more: boolean): void;
-    execute(config: { portal?: string; rows: number; }, more: boolean): void;
-
-    flush(): void;
-    sync(): void;
-}
-
-interface RowDescription {
-    name        : 'rowDescription';
-    length      : number;
-    fieldCount  : number;
-    fields      : FieldDescription[];
-}
-
-interface FieldDescription {
-    name            : string;
-    tableID         : number;
-    columnID        : number;
-    dataTypeID      : number;
-    dataTypeSize    : number;
-    dataTypeModifier: number;
-    format          : string;
-}
-
-interface DataRow {
-    name            : 'dataRow';
-    length          : number;
-    fieldCount      : number;
-    fields          : string[];
-}
-
-interface CommandComplete {
-    name            : 'commandComplete';
-    length          : number;
-    text            : string;
 }

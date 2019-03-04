@@ -70,7 +70,7 @@ export class DaoSession implements Dao {
     // MODEL METHODS
     // --------------------------------------------------------------------------------------------
     getOne<T extends typeof Model>(type: T, id: string): InstanceType<T> | undefined {
-        return this.store.get(type as any, id);
+        return this.store.getOne(type as any, id);
     }
 
     getAll<T extends typeof Model>(type: T): ReadonlyMap<string, InstanceType<T>> {

@@ -1,6 +1,6 @@
 // IMPORTS
 // ================================================================================================
-import { Model as IModel, FieldDescriptor, Query, SelectAllModelsQuery, SelectOneModelQuery, IdGenerator, FieldMap, QueryMask } from '@nova/pg-dao';
+import { Model as IModel, FieldDescriptor, Query, SelectAllModelsQuery, SelectOneModelQuery, IdGenerator, FieldMap, QueryMask, SaveOriginalMethod } from '@nova/pg-dao';
 import { DbSchema, DbField, SelectModelQuery, InsertModelQuery, UpdateModelQuery, DeleteModelQuery, queries } from './schema';
 import { ModelError } from './errors';
 
@@ -11,7 +11,6 @@ export const symCreated = Symbol('created');
 export const symDeleted = Symbol('deleted');
 
 const symOriginal = Symbol('original');
-const symKeepReadonly = Symbol();
 
 // PUBLIC FUNCTIONS
 // ================================================================================================
@@ -47,7 +46,6 @@ export class Model implements IModel {
     updatedOn!              : number;
 
     [symOriginal]           : any;
-    [symKeepReadonly]       : boolean;
 
     [symMutable]            : boolean;
     [symCreated]            : boolean;
@@ -55,23 +53,24 @@ export class Model implements IModel {
 
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(seed: string[] | object, fieldsOrClone?: FieldDescriptor[] | boolean) {
+    constructor(seed: string[] | object, fieldsOrDeepCopy?: FieldDescriptor[] | boolean, saveOriginal?: SaveOriginalMethod) {
         const schema = (this.constructor as typeof Model).getSchema();
 
         if (Array.isArray(seed)) {
             // the model is being built from database row
-            if (!Array.isArray(fieldsOrClone)) throw new TypeError('Model fields are invalid');
-            this[symOriginal] = {};
-            this[symKeepReadonly] = true;   // TODO: add to arguments
-            this.infuse(seed, fieldsOrClone);
+            if (!Array.isArray(fieldsOrDeepCopy)) throw new TypeError('Model fields are invalid');
+            if (saveOriginal) {
+                this[symOriginal] = {};
+            }
+            this.infuse(seed, fieldsOrDeepCopy, saveOriginal === SaveOriginalMethod.saveAllFields);
         }
         else {
             // the model is being built from an object
             if (!seed || typeof seed !== 'object') throw new TypeError('Model seed is invalid');
-            const clone = (fieldsOrClone === undefined) ? false: fieldsOrClone;
-            if (typeof clone !== 'boolean') throw new TypeError('Clone flag is invalid');
+            const deepCopy = (fieldsOrDeepCopy === undefined) ? false: fieldsOrDeepCopy;
+            if (typeof deepCopy !== 'boolean') throw new TypeError('Clone flag is invalid');
 
-            if (clone) {
+            if (deepCopy) {
                 // make a deep copy of the seed
                 for (let field of schema.fields) {
                     let fieldName = field.name as keyof this;
@@ -151,13 +150,12 @@ export class Model implements IModel {
         return this[symDeleted];
     }
 
-    isModified(): boolean {
+    isModified(checkReadonlyFields = true): boolean {
         const schema = (this.constructor as typeof Model).getSchema();
         const original = this[symOriginal];
         if (!original) return false;
 
         try {
-            const checkReadonlyFields = this[symKeepReadonly];
             for (let field of schema.fields) {
                 if (!checkReadonlyFields && field.readonly) continue;
     
@@ -179,14 +177,12 @@ export class Model implements IModel {
 
     // MODEL METHODS
     // --------------------------------------------------------------------------------------------
-    infuse(rowData: string[], dbFields: FieldDescriptor[]) {
+    infuse(rowData: string[], dbFields: FieldDescriptor[], cloneReadonlyFields = true) {
         const fields = (this.constructor as typeof Model).getSchema().fields;
         if (fields.length !== rowData.length) throw new ModelError('Model row data is inconsistent');
         if (fields.length !== dbFields.length) throw new ModelError('Model fields are inconsistent');
 
         const original = this[symOriginal];
-        const keepReadonly = this[symKeepReadonly];
-
         for (let i = 0; i < fields.length; i++) {
             let field = fields[i];
             let fieldName = field.name as keyof this;
@@ -195,14 +191,14 @@ export class Model implements IModel {
 
             if (original) {
                 // don't keep originals of read-only fields when not needed
-                if (!keepReadonly && field.readonly) continue;
+                if (!cloneReadonlyFields && field.readonly) continue;
                 original[fieldName] = field.clone ? field.clone(fieldValue) : fieldValue;
             }
         }
         this[symOriginal] = original;
     }
 
-    getSyncQueries(updatedOn: number): Query[] | undefined {
+    getSyncQueries(updatedOn: number, checkReadonlyFields = true): Query[] | undefined {
         if (this[symCreated]) {
             return [this.buildInsertQuery()];
         }
@@ -210,36 +206,9 @@ export class Model implements IModel {
             return [this.buildDeleteQuery()];
         }
         else {
-            // check if the model has original values
-            const original = this[symOriginal];
-            if (!original) return undefined;
-
-            // check if any fields have changed
-            const checkReadonlyFields = this[symKeepReadonly];
             const schema = (this.constructor as typeof Model).getSchema();
-            const changes: DbField[] = [];
-            try {
-                for (let field of schema.fields) {
-                    if (!checkReadonlyFields && field.readonly) continue;
-    
-                    let fieldName = field.name as keyof this;
-                    if (field.areEqual) {
-                        if (!field.areEqual(original[fieldName], this[fieldName])) {
-                            changes.push(field);
-                        }
-                    }
-                    else {
-                        if (original[fieldName] !== this[fieldName]) {
-                            changes.push(field);
-                        }
-                    }
-                }
-            }
-            catch(error) {
-                throw new ModelError(`Failed to identify changes in ${schema.name} model`, error);
-            }
-
-            if (changes.length > 0) {
+            const changes = this.getChanges(checkReadonlyFields);
+            if (changes && changes.length > 0) {
                 this.updatedOn = updatedOn;
                 changes.push(schema.getField('updatedOn')!);
                 return [this.buildUpdateQuery(changes)];
@@ -247,20 +216,19 @@ export class Model implements IModel {
         }
     }
 
-    saveOriginal(keepReadonlyFields: boolean) {
+    saveOriginal(cloneReadonlyFields: boolean) {
         const schema = (this.constructor as typeof Model).getSchema();
         const original: any = {};
 
         try {
             for (let field of schema.fields) {
-                if (!keepReadonlyFields && field.readonly) continue;
+                if (!cloneReadonlyFields && field.readonly) continue;
                 let fieldName = field.name as keyof this;
                 let fieldValue = this[fieldName];
                 original[fieldName] = field.clone ? field.clone(fieldValue) : fieldValue;
             }
     
             this[symOriginal] = original;
-            this[symKeepReadonly] = keepReadonlyFields;
         }
         catch (error) {
             throw new ModelError(`Failed to clone ${schema.name} model`, error);
@@ -273,6 +241,39 @@ export class Model implements IModel {
 
     // PRIVATE METHODS
     // --------------------------------------------------------------------------------------------
+    private getChanges(checkReadonlyFields: boolean) {
+        
+        // check if the model has original values
+        const original = this[symOriginal];
+        if (!original) return undefined;
+
+        // check if any fields have changed
+        const schema = (this.constructor as typeof Model).getSchema();
+        const changes: DbField[] = [];
+        try {
+            for (let field of schema.fields) {
+                if (!checkReadonlyFields && field.readonly) continue;
+
+                let fieldName = field.name as keyof this;
+                if (field.areEqual) {
+                    if (!field.areEqual(original[fieldName], this[fieldName])) {
+                        changes.push(field);
+                    }
+                }
+                else {
+                    if (original[fieldName] !== this[fieldName]) {
+                        changes.push(field);
+                    }
+                }
+            }
+        }
+        catch(error) {
+            throw new ModelError(`Failed to identify changes in ${schema.name} model`, error);
+        }
+
+        return changes;
+    }
+
     private buildInsertQuery() {
         const schema = (this.constructor as typeof Model).getSchema();
         const qInsertModel = (this.constructor as typeof Model).qInsertModel;
@@ -307,4 +308,3 @@ export class Model implements IModel {
         return new qDeleteModel(this);
     }
 }
-

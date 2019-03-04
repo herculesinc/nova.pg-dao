@@ -1,8 +1,8 @@
 // IMPORTS
 // ================================================================================================
-import { types } from 'pg';
+import { types, FieldDescription } from 'pg';
 import { QueryMask, FieldParser } from '@nova/pg-dao';
-import { Result, FieldDescription } from './index';
+import { Result } from './index';
 
 // MODULE VARIABLES
 // ================================================================================================

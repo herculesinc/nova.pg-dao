@@ -13,7 +13,7 @@ class Store {
     }
     // ACCESSORS
     // --------------------------------------------------------------------------------------------
-    get(type, id) {
+    getOne(type, id) {
         if (!Model_1.isModelClass(type))
             throw new TypeError('Cannot get model: model type is invalid');
         if (typeof id !== 'string')
@@ -51,10 +51,17 @@ class Store {
                     throw new errors_1.SessionError(`Cannot reload ${type.name} model: model has been modified`);
                 }
             }
-            model.infuse(rowData, fields);
+            model.infuse(rowData, fields, this.checkImmutable);
         }
         else {
-            model = new type(rowData, fields);
+            let saveOriginal = 0 /* dontSave */;
+            if (this.checkImmutable) {
+                saveOriginal = 2 /* saveAllFields */;
+            }
+            else if (mutable) {
+                saveOriginal = 1 /* saveMutableFields */;
+            }
+            model = new type(rowData, fields, saveOriginal);
             this.models.set(uid, model);
         }
         model[Model_1.symMutable] = mutable;
@@ -72,8 +79,7 @@ class Store {
             model[Model_1.symCreated] = true;
         }
         else {
-            // TODO: make based on config
-            model.saveOriginal(true);
+            model.saveOriginal(this.checkImmutable);
         }
         this.models.set(uid, model);
         return model;
@@ -105,7 +111,7 @@ class Store {
         if (this.checkImmutable) {
             // iterate through models and check every model for changes
             for (let model of this.models.values()) {
-                const mQueries = model.getSyncQueries(updatedOn);
+                const mQueries = model.getSyncQueries(updatedOn, true);
                 if (!mQueries)
                     continue;
                 if (mQueries.length === 1) {
@@ -121,7 +127,7 @@ class Store {
             for (let model of this.models.values()) {
                 if (!model[Model_1.symMutable])
                     continue;
-                const mQueries = model.getSyncQueries(updatedOn);
+                const mQueries = model.getSyncQueries(updatedOn, false);
                 if (!mQueries)
                     continue;
                 if (mQueries.length > 0) {
@@ -146,10 +152,12 @@ class Store {
                 this.models.delete(uid);
                 model.clearOriginal();
             }
-            else {
-                // TODO: make based on config
-                model.saveOriginal(true);
+            else if (model[Model_1.symCreated]) {
                 model[Model_1.symCreated] = false;
+                model.saveOriginal(this.checkImmutable);
+            }
+            else {
+                model.saveOriginal(this.checkImmutable);
             }
         }
     }

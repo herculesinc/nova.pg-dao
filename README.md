@@ -1,5 +1,5 @@
 # Nova PostgreSQL DAO
-PostgreSQL data access object for Nova framework.
+PostgreSQL data access module for Nova framework.
 
 ## Install
 

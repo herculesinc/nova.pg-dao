@@ -35,7 +35,7 @@ class DaoSession {
     // MODEL METHODS
     // --------------------------------------------------------------------------------------------
     getOne(type, id) {
-        return this.store.get(type, id);
+        return this.store.getOne(type, id);
     }
     getAll(type) {
         return this.store.getAll(type);

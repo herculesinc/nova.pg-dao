@@ -8,7 +8,6 @@ exports.symMutable = Symbol('mutable');
 exports.symCreated = Symbol('created');
 exports.symDeleted = Symbol('deleted');
 const symOriginal = Symbol('original');
-const symKeepReadonly = Symbol();
 // PUBLIC FUNCTIONS
 // ================================================================================================
 function getModelClass(model) {
@@ -34,24 +33,25 @@ exports.isModelClass = isModelClass;
 class Model {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(seed, fieldsOrClone) {
+    constructor(seed, fieldsOrDeepCopy, saveOriginal) {
         const schema = this.constructor.getSchema();
         if (Array.isArray(seed)) {
             // the model is being built from database row
-            if (!Array.isArray(fieldsOrClone))
+            if (!Array.isArray(fieldsOrDeepCopy))
                 throw new TypeError('Model fields are invalid');
-            this[symOriginal] = {};
-            this[symKeepReadonly] = true; // TODO: add to arguments
-            this.infuse(seed, fieldsOrClone);
+            if (saveOriginal) {
+                this[symOriginal] = {};
+            }
+            this.infuse(seed, fieldsOrDeepCopy, saveOriginal === 2 /* saveAllFields */);
         }
         else {
             // the model is being built from an object
             if (!seed || typeof seed !== 'object')
                 throw new TypeError('Model seed is invalid');
-            const clone = (fieldsOrClone === undefined) ? false : fieldsOrClone;
-            if (typeof clone !== 'boolean')
+            const deepCopy = (fieldsOrDeepCopy === undefined) ? false : fieldsOrDeepCopy;
+            if (typeof deepCopy !== 'boolean')
                 throw new TypeError('Clone flag is invalid');
-            if (clone) {
+            if (deepCopy) {
                 // make a deep copy of the seed
                 for (let field of schema.fields) {
                     let fieldName = field.name;
@@ -119,13 +119,12 @@ class Model {
     isDeleted() {
         return this[exports.symDeleted];
     }
-    isModified() {
+    isModified(checkReadonlyFields = true) {
         const schema = this.constructor.getSchema();
         const original = this[symOriginal];
         if (!original)
             return false;
         try {
-            const checkReadonlyFields = this[symKeepReadonly];
             for (let field of schema.fields) {
                 if (!checkReadonlyFields && field.readonly)
                     continue;
@@ -147,14 +146,13 @@ class Model {
     }
     // MODEL METHODS
     // --------------------------------------------------------------------------------------------
-    infuse(rowData, dbFields) {
+    infuse(rowData, dbFields, cloneReadonlyFields = true) {
         const fields = this.constructor.getSchema().fields;
         if (fields.length !== rowData.length)
             throw new errors_1.ModelError('Model row data is inconsistent');
         if (fields.length !== dbFields.length)
             throw new errors_1.ModelError('Model fields are inconsistent');
         const original = this[symOriginal];
-        const keepReadonly = this[symKeepReadonly];
         for (let i = 0; i < fields.length; i++) {
             let field = fields[i];
             let fieldName = field.name;
@@ -162,14 +160,14 @@ class Model {
             this[fieldName] = fieldValue;
             if (original) {
                 // don't keep originals of read-only fields when not needed
-                if (!keepReadonly && field.readonly)
+                if (!cloneReadonlyFields && field.readonly)
                     continue;
                 original[fieldName] = field.clone ? field.clone(fieldValue) : fieldValue;
             }
         }
         this[symOriginal] = original;
     }
-    getSyncQueries(updatedOn) {
+    getSyncQueries(updatedOn, checkReadonlyFields = true) {
         if (this[exports.symCreated]) {
             return [this.buildInsertQuery()];
         }
@@ -177,54 +175,27 @@ class Model {
             return [this.buildDeleteQuery()];
         }
         else {
-            // check if the model has original values
-            const original = this[symOriginal];
-            if (!original)
-                return undefined;
-            // check if any fields have changed
-            const checkReadonlyFields = this[symKeepReadonly];
             const schema = this.constructor.getSchema();
-            const changes = [];
-            try {
-                for (let field of schema.fields) {
-                    if (!checkReadonlyFields && field.readonly)
-                        continue;
-                    let fieldName = field.name;
-                    if (field.areEqual) {
-                        if (!field.areEqual(original[fieldName], this[fieldName])) {
-                            changes.push(field);
-                        }
-                    }
-                    else {
-                        if (original[fieldName] !== this[fieldName]) {
-                            changes.push(field);
-                        }
-                    }
-                }
-            }
-            catch (error) {
-                throw new errors_1.ModelError(`Failed to identify changes in ${schema.name} model`, error);
-            }
-            if (changes.length > 0) {
+            const changes = this.getChanges(checkReadonlyFields);
+            if (changes && changes.length > 0) {
                 this.updatedOn = updatedOn;
                 changes.push(schema.getField('updatedOn'));
                 return [this.buildUpdateQuery(changes)];
             }
         }
     }
-    saveOriginal(keepReadonlyFields) {
+    saveOriginal(cloneReadonlyFields) {
         const schema = this.constructor.getSchema();
         const original = {};
         try {
             for (let field of schema.fields) {
-                if (!keepReadonlyFields && field.readonly)
+                if (!cloneReadonlyFields && field.readonly)
                     continue;
                 let fieldName = field.name;
                 let fieldValue = this[fieldName];
                 original[fieldName] = field.clone ? field.clone(fieldValue) : fieldValue;
             }
             this[symOriginal] = original;
-            this[symKeepReadonly] = keepReadonlyFields;
         }
         catch (error) {
             throw new errors_1.ModelError(`Failed to clone ${schema.name} model`, error);
@@ -235,6 +206,36 @@ class Model {
     }
     // PRIVATE METHODS
     // --------------------------------------------------------------------------------------------
+    getChanges(checkReadonlyFields) {
+        // check if the model has original values
+        const original = this[symOriginal];
+        if (!original)
+            return undefined;
+        // check if any fields have changed
+        const schema = this.constructor.getSchema();
+        const changes = [];
+        try {
+            for (let field of schema.fields) {
+                if (!checkReadonlyFields && field.readonly)
+                    continue;
+                let fieldName = field.name;
+                if (field.areEqual) {
+                    if (!field.areEqual(original[fieldName], this[fieldName])) {
+                        changes.push(field);
+                    }
+                }
+                else {
+                    if (original[fieldName] !== this[fieldName]) {
+                        changes.push(field);
+                    }
+                }
+            }
+        }
+        catch (error) {
+            throw new errors_1.ModelError(`Failed to identify changes in ${schema.name} model`, error);
+        }
+        return changes;
+    }
     buildInsertQuery() {
         const schema = this.constructor.getSchema();
         const qInsertModel = this.constructor.qInsertModel;

@@ -1,6 +1,7 @@
 // IMPORTS
 // ================================================================================================
-import { Result, FieldDescription } from './index';
+import { FieldDescription } from 'pg';
+import { Result } from './index';
 
 // CLASS DEFINITION
 // ================================================================================================
