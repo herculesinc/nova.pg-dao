@@ -795,7 +795,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
         });
     });
 
-    describe.only('flush/close methods tests;', () => {
+    describe('flush/close methods tests;', () => {
         let UserModel: any;
         let created: any;
         let updated: any;
