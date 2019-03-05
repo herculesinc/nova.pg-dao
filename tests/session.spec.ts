@@ -10,7 +10,6 @@ import { Database, Model, dbField, dbModel, PgIdGenerator, Query, Operators } fr
 import { DaoSession, SessionOptions, PoolState, QueryHandler, FieldHandler, QueryTextLogLevel } from '@nova/pg-dao';
 import { User, prepareDatabase } from './setup';
 import { settings } from './settings';
-import { MockLogger } from './mocks/Logger';
 import { ConnectionError, SessionError, QueryError, ParseError, ModelError } from '../lib/errors';
 
 let db: Database;
@@ -22,8 +21,6 @@ const options: SessionOptions = {
     logQueryText        : QueryTextLogLevel.never
 };
 
-const logger = new MockLogger();
-
 const idHandler: QueryHandler = {
     parse: (row: any[]): any => row[0]
 };
@@ -32,7 +29,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
     describe('Query tests;', () => {
         beforeEach(async () => {
             db = new Database(settings);
-            session = db.getSession(options, logger);
+            session = db.getSession(options, null);
 
             await prepareDatabase(session);
         });
@@ -298,8 +295,8 @@ describe('NOVA.PG-DAO -> Session;', () => {
             expect(poolState.size).to.equal(0);
             expect(poolState.idle).to.equal(0);
 
-            const session1 = db.getSession(options, logger);
-            const session2 = db.getSession(options, logger);
+            const session1 = db.getSession(options, null);
+            const session2 = db.getSession(options, null);
             poolState = db.getPoolState();
 
             expect(poolState.size).to.equal(0);
@@ -327,8 +324,8 @@ describe('NOVA.PG-DAO -> Session;', () => {
             expect(poolState.size).to.equal(0);
             expect(poolState.idle).to.equal(0);
 
-            const session1 = db.getSession(options, logger);
-            const session2 = db.getSession(options, logger);
+            const session1 = db.getSession(options, null);
+            const session2 = db.getSession(options, null);
 
             await prepareDatabase(session1);
             await prepareDatabase(session2);
@@ -351,12 +348,12 @@ describe('NOVA.PG-DAO -> Session;', () => {
         });
 
         it('Committing a transaction should update the data in the database', async () => {
-            session = db.getSession(options, logger);
+            session = db.getSession(options, null);
 
             await prepareDatabase(session);
             await session.close('commit');
 
-            session = db.getSession(options, logger);
+            session = db.getSession(options, null);
 
             const query1 = Query.from('UPDATE tmp_users SET username = \'Test\' WHERE id = 1;');
 
@@ -370,7 +367,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             expect(session.isActive).to.be.false;
             expect(session.inTransaction).to.be.false;
 
-            session = db.getSession(options, logger);
+            session = db.getSession(options, null);
 
             const query2 = Query.from('SELECT * FROM tmp_users WHERE id = 1;', 'query', 'single');
 
@@ -383,12 +380,12 @@ describe('NOVA.PG-DAO -> Session;', () => {
         });
 
         it('Rolling back a transaction should not change the data in the database', async () => {
-            session = db.getSession(options, logger);
+            session = db.getSession(options, null);
 
             await prepareDatabase(session);
             await session.close('commit');
 
-            session = db.getSession(options, logger);
+            session = db.getSession(options, null);
 
             const query1 = Query.from('UPDATE tmp_users SET username = \'Test\' WHERE id = 1;');
 
@@ -402,7 +399,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             expect(session.isActive).to.be.false;
             expect(session.inTransaction).to.be.false;
 
-            session = db.getSession(options, logger);
+            session = db.getSession(options, null);
 
             const query2 = Query.from('SELECT * FROM tmp_users WHERE id = 1;', 'query', 'single');
 
@@ -423,7 +420,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
         beforeEach(async () => {
             db = new Database(settings);
-            session = db.getSession(options, logger);
+            session = db.getSession(options, null);
 
             await prepareDatabase(session);
             await session.close('commit');
@@ -448,7 +445,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
         describe('fetchOne() method', () => {
             beforeEach(() => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
             });
 
             it('should be called without an error', async () => {
@@ -513,7 +510,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
         describe('fetchAll() method', () => {
             beforeEach(() => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
             });
 
             it('should be called without an error', async () => {
@@ -573,7 +570,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
         describe('getOne() method', () => {
             beforeEach(() => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
             });
 
             it('should be called without an error', async () => {
@@ -625,7 +622,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
         describe('getAll() method', () => {
             beforeEach(() => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
             });
 
             it('should be called without an error', async () => {
@@ -684,7 +681,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
         describe('create() method', () => {
             beforeEach(() => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
             });
 
             it('should be called without an error', async () => {
@@ -709,7 +706,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 const user = await session.create(UserModel, {username: 'username', tags: [1,2]});
                 await session.close('commit');
 
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
 
                 const fetchedUser = await session.fetchOne(UserModel, { id: user.id });
                 const fetchedUsers = await session.fetchAll(UserModel, 'id is not null');
@@ -727,7 +724,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             let user: any;
 
             beforeEach(async () => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
                 user = await await session.fetchOne(UserModel, {id: '1'}, true);
             });
 
@@ -751,7 +748,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 session.delete(user);
                 await session.close('commit');
 
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
 
                 const fetchedUser = await session.fetchOne(UserModel, { id: user.id });
                 const fetchedUsers = await session.fetchAll(UserModel, 'id is not null');
@@ -765,7 +762,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             const seed = {id: '6', username: 'test', createdOn: Date.now(), updatedOn: Date.now(), tags: [1,2]};
 
             beforeEach(() => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
             });
 
             it('should be called without an error', () => {
@@ -817,7 +814,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                     beforeEach(async () => {
                         sOptions = { ...options, verifyImmutability };
                         db = new Database(settings);
-                        session = db.getSession(sOptions, logger);
+                        session = db.getSession(sOptions, null);
 
                         await prepareDatabase(session);
                         await session.close('commit');
@@ -833,7 +830,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
                         UserModel = UModel;
 
-                        session = db.getSession(sOptions, logger);
+                        session = db.getSession(sOptions, null);
 
                         const dUser = await session.fetchOne(UserModel, {id: '1'}, true);
 
@@ -915,7 +912,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
             beforeEach(async () => {
                 db = new Database(settings);
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
 
                 await prepareDatabase(session);
                 await session.close('commit');
@@ -943,7 +940,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 describe('and dirty immutable models', () => {
                     beforeEach(async () => {
                         sOptions.readonly = false;
-                        session = db.getSession(sOptions, logger);
+                        session = db.getSession(sOptions, null);
         
                         user = await session.fetchOne(UserModel, { id: '1' }, false);
                         originalUsername = user.username;
@@ -961,7 +958,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                     it('should not update data in the database', async () => {
                         await session.close('commit');
     
-                        session = db.getSession(options, logger);
+                        session = db.getSession(options, null);
     
                         const uUser = await session.fetchOne(UserModel, {id: user.id});
     
@@ -975,7 +972,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 describe('and dirty models in read-only session', () => {
                     beforeEach(async () => {
                         sOptions.readonly = true;
-                        session = db.getSession(sOptions, logger);
+                        session = db.getSession(sOptions, null);
         
                         user = await session.fetchOne(UserModel, { id: '1' }, false);
                         originalUsername = user.username;
@@ -993,7 +990,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                     it(`should not update data in the database`, async () => {
                         await session.close('commit');
     
-                        session = db.getSession(options, logger);
+                        session = db.getSession(options, null);
     
                         const uUser = await session.fetchOne(UserModel, {id: user.id});
     
@@ -1019,7 +1016,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
         beforeEach(async () => {
             db = new Database(settings);
-            session = db.getSession(options, logger);
+            session = db.getSession(options, null);
 
             await prepareDatabase(session);
 
@@ -1198,7 +1195,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
         describe('Connection errors', async() => {
 
             beforeEach(async () => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
                 await prepareDatabase(session);
             });
 
@@ -1215,7 +1212,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 settings1.connection.port = 1234;
 
                 const database = new Database(settings1);
-                const eSession = database.getSession(options, logger);
+                const eSession = database.getSession(options, null);
 
                 const query = Query.from('DROP TABLE IF EXISTS tmp_users;');
 
@@ -1232,10 +1229,10 @@ describe('NOVA.PG-DAO -> Session;', () => {
         describe('Query execution errors', async() => {
 
             beforeEach(async () => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
                 await prepareDatabase(session);
                 await session.close('commit');
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
             });
 
             afterEach(async () => {
@@ -1320,10 +1317,10 @@ describe('NOVA.PG-DAO -> Session;', () => {
             const readOnlyOpts = {...options, readonly: true};
 
             beforeEach(async () => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
                 await prepareDatabase(session);
                 await session.close('commit');
-                session = db.getSession(readOnlyOpts, logger);
+                session = db.getSession(readOnlyOpts, null);
 
                 @dbModel('tmp_users', new PgIdGenerator('tmp_users_id_seq'))
                 class UModel extends Model {
@@ -1368,10 +1365,10 @@ describe('NOVA.PG-DAO -> Session;', () => {
             const readOnlyOpts = {...options, readonly: true};
 
             beforeEach(async () => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
                 await prepareDatabase(session);
                 await session.close('commit');
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
 
                 @dbModel('tmp_users', new PgIdGenerator('tmp_users_id_seq'))
                 class UModel extends Model {
@@ -1392,7 +1389,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Flushing a read-only session should throw error', async () => {
-                session = db.getSession(readOnlyOpts, logger);
+                session = db.getSession(readOnlyOpts, null);
 
                 expect(session.isActive).to.be.true;
                 expect(session.isReadOnly).to.be.true;
@@ -1401,7 +1398,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Flushing a closed session should throw error', async () => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
                 await session.close('commit');
 
                 expect(session.isActive).to.be.false;
@@ -1411,7 +1408,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Closing an already closed session should throw error', async () => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
                 await session.close('commit');
 
                 expect(session.isActive).to.be.false;
@@ -1420,12 +1417,12 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Closing read-only session with dirty models should throw error', async () => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
 
                 await prepareDatabase(session);
                 await session.close('commit');
 
-                session = db.getSession(readOnlyOpts, logger);
+                session = db.getSession(readOnlyOpts, null);
 
                 expect(session.isReadOnly).to.be.true;
 
@@ -1440,7 +1437,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
             describe('Closing session with invalid action should throw an error', async () => {
                 beforeEach(async () => {
-                    session = db.getSession(options, logger);
+                    session = db.getSession(options, null);
                 });
 
                 afterEach(async () => {
@@ -1462,10 +1459,10 @@ describe('NOVA.PG-DAO -> Session;', () => {
             let UserModel: any;
 
             beforeEach(async () => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
                 await prepareDatabase(session);
                 await session.close('commit');
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
 
                 @dbModel('tmp_users', new PgIdGenerator('tmp_users_id_seq'))
                 class UModel extends Model {
@@ -1486,7 +1483,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
 
             it('Reloading a dirty model should throw an error', async () => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
 
                 const user = await session.fetchOne(UserModel, { id: '1' }, true);
                 user.username = 'modified';
@@ -1503,10 +1500,10 @@ describe('NOVA.PG-DAO -> Session;', () => {
             const idGenerator = new PgIdGenerator(`${table}_id_seq`);
 
             beforeEach(async () => {
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
                 await prepareDatabase(session);
                 await session.close('commit');
-                session = db.getSession(options, logger);
+                session = db.getSession(options, null);
 
                 customHandler = {
                     parse    : (value: string): string[] => JSON.parse(value),

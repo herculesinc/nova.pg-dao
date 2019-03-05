@@ -52,7 +52,7 @@ declare module "@nova/pg-dao" {
 
         getPoolState(): PoolState;
         
-        getSession(options?: Partial<SessionOptions>, logger?: Logger): DaoSession;
+        getSession(options?: Partial<SessionOptions>, logger?: Logger | null): DaoSession;
         close(): Promise<any>;
 
         on(event: 'error', listener: (error: Error) => void): this;

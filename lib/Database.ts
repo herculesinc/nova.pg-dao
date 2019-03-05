@@ -36,9 +36,12 @@ export class Database extends EventEmitter {
 
     // PUBLIC METHODS
     // --------------------------------------------------------------------------------------------
-    getSession(options?: Partial<SessionOptions>, logger?: nova.Logger): DaoSession {
+    getSession(options?: Partial<SessionOptions>, logger?: nova.Logger | null): DaoSession {
         const sOptions = { ...defaults.session, ...options };
-        return new DaoSession(this.pool, sOptions, this.source, logger || nova.logger);
+        if (logger === undefined) {
+            logger = nova.logger;
+        }
+        return new DaoSession(this.pool, sOptions, this.source, logger || undefined);
     }
 
     close(): Promise<any> {

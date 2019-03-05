@@ -162,6 +162,8 @@ class Command {
     // PRIVATE METHODS
     // --------------------------------------------------------------------------------------------
     logResultTrace(query, result, success, endTs) {
+        if (!this.logger)
+            return;
         let logQueryText = this.logQueryText > 0 /* never */;
         if (this.logQueryText === 1 /* onError */ && success) {
             logQueryText = false;

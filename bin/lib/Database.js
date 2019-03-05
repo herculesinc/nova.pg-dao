@@ -31,7 +31,10 @@ class Database extends events_1.EventEmitter {
     // --------------------------------------------------------------------------------------------
     getSession(options, logger) {
         const sOptions = Object.assign({}, defaults_1.defaults.session, options);
-        return new Session_1.DaoSession(this.pool, sOptions, this.source, logger || nova.logger);
+        if (logger === undefined) {
+            logger = nova.logger;
+        }
+        return new Session_1.DaoSession(this.pool, sOptions, this.source, logger || undefined);
     }
     close() {
         return this.pool.end();

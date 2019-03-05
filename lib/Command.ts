@@ -19,7 +19,7 @@ export class Command implements Submittable {
     private readonly id             : string;
     private readonly store          : Store;
     private readonly source         : TraceSource;
-    private readonly logger         : Logger;
+    private readonly logger?        : Logger;
     private readonly logQueryText   : QueryTextLogLevel;
 
     private text                    : string;
@@ -34,7 +34,7 @@ export class Command implements Submittable {
 
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(store: Store, logger: Logger, source: TraceSource, logQueryText: QueryTextLogLevel) {
+    constructor(store: Store, logger: Logger | undefined, source: TraceSource, logQueryText: QueryTextLogLevel) {
 
         this.id = util.generateTimeId();
         this.store = store;
@@ -205,6 +205,8 @@ export class Command implements Submittable {
     // PRIVATE METHODS
     // --------------------------------------------------------------------------------------------
     private logResultTrace(query: Query, result: Result, success: boolean, endTs: number) {
+        if (!this.logger) return;
+        
         let logQueryText = this.logQueryText > QueryTextLogLevel.never;
         if (this.logQueryText === QueryTextLogLevel.onError && success) {
             logQueryText = false;

@@ -30,14 +30,14 @@ export class DaoSession implements Dao {
     private commands                : Command[];
 
     private readonly store          : Store;
-    private readonly logger         : Logger;
+    private readonly logger?        : Logger;
     private readonly readonly       : boolean;
     private readonly logQueryText   : QueryTextLogLevel;
     private readonly verifyImmutability : boolean;
 
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(db: SessionFactory, options: SessionOptions, source: TraceSource, logger: Logger) {
+    constructor(db: SessionFactory, options: SessionOptions, source: TraceSource, logger?: Logger) {
 
         this.db = db;
         this.source = source;
@@ -200,7 +200,7 @@ export class DaoSession implements Dao {
         try {
             let closePromise: Promise<any>;
             if (action === 'commit') {
-                this.logger.debug('Committing and closing session');
+                this.logger && this.logger.debug('Committing and closing session');
 
                 // flush changes, if needed
                 const flushPromises: Promise<any>[] = [];
@@ -231,7 +231,7 @@ export class DaoSession implements Dao {
             }
             else if (action === 'rollback') {
                 // rollback the transaction
-                this.logger.debug('Committing and closing session');
+                this.logger && this.logger.debug('Committing and closing session');
                 closePromise = this.execute(ROLLBACK_TRANSACTION);
             }
 
@@ -272,12 +272,12 @@ export class DaoSession implements Dao {
         if (firstCommand) {
             const start = Date.now();
             try {
-                this.logger.debug('Connecting to the database');
+                this.logger && this.logger.debug('Connecting to the database');
                 this.client = await this.db.connect();
-                this.logger.trace(this.source, 'connect', Date.now() - start, true);
+                this.logger && this.logger.trace(this.source, 'connect', Date.now() - start, true);
             }
             catch(error) {
-                this.logger.trace(this.source, 'connect', Date.now() - start, false);
+                this.logger && this.logger.trace(this.source, 'connect', Date.now() - start, false);
                 error = new ConnectionError('Cannot execute a query: database connection failed', error);
 
                 // make all queued commands resolve to an error
@@ -353,10 +353,10 @@ export class DaoSession implements Dao {
         if (this.client) {
             this.client.release(error);
             this.client = undefined;
-            this.logger.debug('Session closed');
+            this.logger && this.logger.debug('Session closed');
         }
         else {
-            this.logger.warn('Overlapping client release detected');
+            this.logger && this.logger.warn('Overlapping client release detected');
         }
     }
 }

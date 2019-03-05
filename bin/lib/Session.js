@@ -149,7 +149,7 @@ class DaoSession {
         try {
             let closePromise;
             if (action === 'commit') {
-                this.logger.debug('Committing and closing session');
+                this.logger && this.logger.debug('Committing and closing session');
                 // flush changes, if needed
                 const flushPromises = [];
                 if (!this.isReadOnly) {
@@ -178,7 +178,7 @@ class DaoSession {
             }
             else if (action === 'rollback') {
                 // rollback the transaction
-                this.logger.debug('Committing and closing session');
+                this.logger && this.logger.debug('Committing and closing session');
                 closePromise = this.execute(ROLLBACK_TRANSACTION);
             }
             this.state = 4 /* closing */;
@@ -208,12 +208,12 @@ class DaoSession {
         if (firstCommand) {
             const start = Date.now();
             try {
-                this.logger.debug('Connecting to the database');
+                this.logger && this.logger.debug('Connecting to the database');
                 this.client = await this.db.connect();
-                this.logger.trace(this.source, 'connect', Date.now() - start, true);
+                this.logger && this.logger.trace(this.source, 'connect', Date.now() - start, true);
             }
             catch (error) {
-                this.logger.trace(this.source, 'connect', Date.now() - start, false);
+                this.logger && this.logger.trace(this.source, 'connect', Date.now() - start, false);
                 error = new errors_1.ConnectionError('Cannot execute a query: database connection failed', error);
                 // make all queued commands resolve to an error
                 process.nextTick(() => {
@@ -281,10 +281,10 @@ class DaoSession {
         if (this.client) {
             this.client.release(error);
             this.client = undefined;
-            this.logger.debug('Session closed');
+            this.logger && this.logger.debug('Session closed');
         }
         else {
-            this.logger.warn('Overlapping client release detected');
+            this.logger && this.logger.warn('Overlapping client release detected');
         }
     }
 }
