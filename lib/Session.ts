@@ -1,7 +1,7 @@
 // IMPORTS
 // ================================================================================================
 import { Dao } from '@nova/core';
-import { Model, ModelSelector, Query, SingleResultQuery, ListResultQuery, SessionOptions, Logger, TraceSource } from '@nova/pg-dao';
+import { Model, ModelSelector, Query, SingleResultQuery, ListResultQuery, SessionOptions, Logger, TraceSource, QueryTextLogLevel } from '@nova/pg-dao';
 import { Client } from 'pg';
 import { Command } from './Command';
 import { Store } from './Store';
@@ -32,7 +32,7 @@ export class DaoSession implements Dao {
     private readonly store          : Store;
     private readonly logger         : Logger;
     private readonly readonly       : boolean;
-    private readonly logQueryText   : boolean;
+    private readonly logQueryText   : QueryTextLogLevel;
     private readonly verifyImmutability : boolean;
 
     // CONSTRUCTOR

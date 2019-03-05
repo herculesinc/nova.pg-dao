@@ -39,7 +39,11 @@ declare module "@nova/pg-dao" {
     export interface SessionOptions {
         readonly            : boolean;
         verifyImmutability  : boolean;
-        logQueryText        : boolean;  // TODO: change to log level
+        logQueryText        : QueryTextLogLevel;
+    }
+
+    export const enum QueryTextLogLevel {
+        never = 0, onError = 1, always = 2
     }
 
     export class Database extends EventEmitter {

@@ -1,6 +1,6 @@
 // IMPORTS
 // ================================================================================================
-import { ConnectionSettings, SessionOptions, PoolOptions } from '@nova/pg-dao';
+import { ConnectionSettings, SessionOptions, PoolOptions, QueryTextLogLevel } from '@nova/pg-dao';
 
 // INTERFACES
 // ================================================================================================
@@ -26,7 +26,7 @@ export const defaults: Defaults = {
     session: {
         readonly            : true,
         verifyImmutability  : true,
-        logQueryText        : false
+        logQueryText        : QueryTextLogLevel.onError
     },
     pool: {
         maxSize         : 20,

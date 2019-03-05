@@ -153,17 +153,23 @@ class Model {
         if (fields.length !== dbFields.length)
             throw new errors_1.ModelError('Model fields are inconsistent');
         const original = this[symOriginal];
-        for (let i = 0; i < fields.length; i++) {
-            let field = fields[i];
-            let fieldName = field.name;
-            let fieldValue = field.parse ? field.parse(rowData[i]) : dbFields[i].parser(rowData[i]);
-            this[fieldName] = fieldValue;
-            if (original) {
-                // don't keep originals of read-only fields when not needed
-                if (!cloneReadonlyFields && field.readonly)
-                    continue;
-                original[fieldName] = field.clone ? field.clone(fieldValue) : fieldValue;
+        try {
+            for (let i = 0; i < fields.length; i++) {
+                let field = fields[i];
+                let fieldName = field.name;
+                let fieldValue = field.parse ? field.parse(rowData[i]) : dbFields[i].parser(rowData[i]);
+                this[fieldName] = fieldValue;
+                if (original) {
+                    // don't keep originals of read-only fields when not needed
+                    if (!cloneReadonlyFields && field.readonly)
+                        continue;
+                    original[fieldName] = field.clone ? field.clone(fieldValue) : fieldValue;
+                }
             }
+        }
+        catch (error) {
+            const schema = this.constructor.getSchema();
+            throw new errors_1.ModelError(`Failed to build ${schema.name} model`, error);
         }
         this[symOriginal] = original;
     }

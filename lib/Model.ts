@@ -183,17 +183,23 @@ export class Model implements IModel {
         if (fields.length !== dbFields.length) throw new ModelError('Model fields are inconsistent');
 
         const original = this[symOriginal];
-        for (let i = 0; i < fields.length; i++) {
-            let field = fields[i];
-            let fieldName = field.name as keyof this;
-            let fieldValue = field.parse ? field.parse(rowData[i]) : dbFields[i].parser(rowData[i]);
-            this[fieldName] = fieldValue;
-
-            if (original) {
-                // don't keep originals of read-only fields when not needed
-                if (!cloneReadonlyFields && field.readonly) continue;
-                original[fieldName] = field.clone ? field.clone(fieldValue) : fieldValue;
+        try {
+            for (let i = 0; i < fields.length; i++) {
+                let field = fields[i];
+                let fieldName = field.name as keyof this;
+                let fieldValue = field.parse ? field.parse(rowData[i]) : dbFields[i].parser(rowData[i]);
+                this[fieldName] = fieldValue;
+    
+                if (original) {
+                    // don't keep originals of read-only fields when not needed
+                    if (!cloneReadonlyFields && field.readonly) continue;
+                    original[fieldName] = field.clone ? field.clone(fieldValue) : fieldValue;
+                }
             }
+        }
+        catch (error) {
+            const schema = (this.constructor as typeof Model).getSchema();
+            throw new ModelError(`Failed to build ${schema.name} model`, error)
         }
         this[symOriginal] = original;
     }

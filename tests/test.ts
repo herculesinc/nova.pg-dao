@@ -1,7 +1,7 @@
 // IMPORTS
 // ================================================================================================
 import { Database, Query } from '../index';
-import { ListResultQueryOptions, SingleResultQueryOptions, ResultHandler, FieldHandler } from '@nova/pg-dao';
+import { ListResultQueryOptions, SingleResultQueryOptions, ResultHandler, FieldHandler, QueryTextLogLevel } from '@nova/pg-dao';
 import { Model } from '../lib/Model';
 import { dbModel, dbField, PgIdGenerator, GuidGenerator, Operators as Op } from '../lib/schema';
 
@@ -131,7 +131,7 @@ const database = new Database({
 
 (async function dbTests() {
 
-    const session = database.getSession();
+    const session = database.getSession({ logQueryText: QueryTextLogLevel.onError });
 
     const query1 = Query.from('SELECT id FROM tokens LIMIT 5;', { name: 'query1', mask: 'list', handler: IdHandler })
     const result1 = session.execute(query1);
@@ -143,13 +143,17 @@ const database = new Database({
     const query3 = new template1({ profile: `test's` });
     const result3 = session.execute(query3);
 
+    const errorQuery = Query.from('SELLECT * FROM tokens;');
+
     try {
         const results = await Promise.all([result1, result2, result3 ]);
         console.log(JSON.stringify(results));
 
+        const errResult = await session.execute(errorQuery);
+
         const token = await session.fetchOne(Token, { id: '1554790800074735617'});
         console.log(JSON.stringify(token));
-        
+
         await session.close('commit');
 
         await database.close();
@@ -157,5 +161,8 @@ const database = new Database({
     }
     catch (error) {
         console.error(error);
+        if (session.isActive) {
+            await session.close('rollback');
+        }
     }
 })();

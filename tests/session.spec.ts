@@ -6,8 +6,8 @@ chai.use(chaiAsPromised);
 
 const expect = chai.expect;
 
-import { Database, Model, dbField, dbModel, PgIdGenerator, Query, Operators } from './../index';
-import { DaoSession, SessionOptions, PoolState, QueryHandler, FieldHandler } from '@nova/pg-dao';
+import { Database, Model, dbField, dbModel, PgIdGenerator, Query, Operators } from '../index';
+import { DaoSession, SessionOptions, PoolState, QueryHandler, FieldHandler, QueryTextLogLevel } from '@nova/pg-dao';
 import { User, prepareDatabase } from './setup';
 import { settings } from './settings';
 import { MockLogger } from './mocks/Logger';
@@ -19,7 +19,7 @@ let session: DaoSession;
 const options: SessionOptions = {
     verifyImmutability  : true,
     readonly            : false,
-    logQueryText        : false
+    logQueryText        : QueryTextLogLevel.never
 };
 
 const logger = new MockLogger();
@@ -910,7 +910,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
             const sOptions: SessionOptions = {
                 verifyImmutability  : false,
                 readonly            : false,
-                logQueryText        : false
+                logQueryText        : QueryTextLogLevel.never
             };
 
             beforeEach(async () => {

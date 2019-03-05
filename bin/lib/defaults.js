@@ -15,7 +15,7 @@ exports.defaults = {
     session: {
         readonly: true,
         verifyImmutability: true,
-        logQueryText: false
+        logQueryText: 1 /* onError */
     },
     pool: {
         maxSize: 20,

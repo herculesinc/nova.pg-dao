@@ -2,12 +2,11 @@
 // ================================================================================================
 import { Logger, TraceSource, TraceCommand, Exception } from '@nova/core';
 import { Submittable, Connection, RowDescription, DataRow, CommandComplete } from 'pg';
+import { Query, QueryTextLogLevel } from '@nova/pg-dao';
 import { Result, createResult } from './results';
-import { Query } from './Query';
 import { Store } from './Store'
 import { QueryError, ParseError, ModelError } from './errors';
 import * as util from './util';
-import { ModelResult } from './results/ModelResult';
 
 // MODULE VARIABLES
 // ================================================================================================
@@ -21,7 +20,7 @@ export class Command implements Submittable {
     private readonly store          : Store;
     private readonly source         : TraceSource;
     private readonly logger         : Logger;
-    private readonly logQueryText   : boolean;
+    private readonly logQueryText   : QueryTextLogLevel;
 
     private text                    : string;
     private values?                 : any[];
@@ -35,7 +34,7 @@ export class Command implements Submittable {
 
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    constructor(store: Store, logger: Logger, source: TraceSource, logQueryText: boolean) {
+    constructor(store: Store, logger: Logger, source: TraceSource, logQueryText: QueryTextLogLevel) {
 
         this.id = util.generateTimeId();
         this.store = store;
@@ -131,15 +130,12 @@ export class Command implements Submittable {
         try {
             this.results[this.cursor].addRow(message.fields);
         } catch (error) {
-            const query = this.queries[this.cursor];
             if (error instanceof Exception) {
                 this.canceledDueToError = error;
             }
             else {
-                const result = this.results[this.cursor];
-                this.canceledDueToError = (result instanceof ModelResult)
-                    ? new ModelError(`Failed to build ${result.modelType.name} model`, error)
-                    : new ParseError(`Failed to parse results for ${query.name} query`, error);
+                const query = this.queries[this.cursor];
+                this.canceledDueToError = new ParseError(`Failed to parse results for ${query.name} query`, error);
             }
         }
     }
@@ -209,9 +205,14 @@ export class Command implements Submittable {
     // PRIVATE METHODS
     // --------------------------------------------------------------------------------------------
     private logResultTrace(query: Query, result: Result, success: boolean, endTs: number) {
+        let logQueryText = this.logQueryText > QueryTextLogLevel.never;
+        if (this.logQueryText === QueryTextLogLevel.onError && success) {
+            logQueryText = false;
+        }
+
         const command: TraceCommand = {
             name    : query.name || 'unnamed',
-            text    : this.logQueryText ? query.text : result.command
+            text    : logQueryText ? query.text : result.command
         };
 
         const details = {

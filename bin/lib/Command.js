@@ -6,7 +6,6 @@ const core_1 = require("@nova/core");
 const results_1 = require("./results");
 const errors_1 = require("./errors");
 const util = require("./util");
-const ModelResult_1 = require("./results/ModelResult");
 // MODULE VARIABLES
 // ================================================================================================
 const COMMAND_COMPLETE_REGEX = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/;
@@ -101,15 +100,12 @@ class Command {
             this.results[this.cursor].addRow(message.fields);
         }
         catch (error) {
-            const query = this.queries[this.cursor];
             if (error instanceof core_1.Exception) {
                 this.canceledDueToError = error;
             }
             else {
-                const result = this.results[this.cursor];
-                this.canceledDueToError = (result instanceof ModelResult_1.ModelResult)
-                    ? new errors_1.ModelError(`Failed to build ${result.modelType.name} model`, error)
-                    : new errors_1.ParseError(`Failed to parse results for ${query.name} query`, error);
+                const query = this.queries[this.cursor];
+                this.canceledDueToError = new errors_1.ParseError(`Failed to parse results for ${query.name} query`, error);
             }
         }
     }
@@ -166,9 +162,13 @@ class Command {
     // PRIVATE METHODS
     // --------------------------------------------------------------------------------------------
     logResultTrace(query, result, success, endTs) {
+        let logQueryText = this.logQueryText > 0 /* never */;
+        if (this.logQueryText === 1 /* onError */ && success) {
+            logQueryText = false;
+        }
         const command = {
             name: query.name || 'unnamed',
-            text: this.logQueryText ? query.text : result.command
+            text: logQueryText ? query.text : result.command
         };
         const details = {
             commandId: this.id,
