@@ -805,13 +805,13 @@ describe('NOVA.PG-DAO -> Session;', () => {
         const table = 'tmp_users';
         const idGenerator = new PgIdGenerator(`${table}_id_seq`);
 
-        describe('flush method', () => {
+        describe('flushing a session', () => {
             [
                 true, false
             ].forEach(verifyImmutability => {
                 const title = verifyImmutability
-                    ? 'With \'verifyImmutability\' flag'
-                    : 'Without \'verifyImmutability\' flag';
+                    ? 'with verifyImmutability=true'
+                    : 'with verifyImmutability=false';
 
                 describe(title, () => {
                     beforeEach(async () => {
@@ -850,11 +850,11 @@ describe('NOVA.PG-DAO -> Session;', () => {
                         }
                     });
 
-                    it('should be called without an error', async () => {
+                    it('should be performed without an error', async () => {
                         await session.flush();
                     });
 
-                    it('state of flushed models should be updated correctly', async () => {
+                    it('should update the state of flushed models correctly', async () => {
                         await session.flush();
 
                         [created, updated].forEach((model: any) => {
@@ -870,7 +870,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                         expect(deleted.hasChanged()).to.be.false;
                     });
 
-                    it('updatedOn field for updated model should be changed', async () => {
+                    it('should update updatedOn field for updated model', async () => {
                         const originUpdateOn = updated.updatedOn;
 
                         await session.flush();
@@ -878,7 +878,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                         expect(updated.updatedOn).to.be.greaterThan(originUpdateOn);
                     });
 
-                    it('db should be updated after flush() method', async () => {
+                    it('should update data in the database correctly', async () => {
                         await session.flush();
 
                         const cUser = await session.fetchOne(UserModel, {id: created.id});
@@ -898,12 +898,18 @@ describe('NOVA.PG-DAO -> Session;', () => {
             });
         });
 
-        describe('close() method', () => {
+        describe('closing a session', () => {
+
+            // TODO: add more tests
+            // checking model state after close for updated models
+            // checking database state after close for updated models
+
             let user: any;
+            let originalUsername: string;
 
             const sOptions: SessionOptions = {
                 verifyImmutability  : false,
-                readonly            : true,
+                readonly            : false,
                 logQueryText        : false
             };
 
@@ -924,12 +930,6 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 }
 
                 UserModel = UModel;
-
-                session = db.getSession(sOptions, logger);
-
-                user = await session.fetchOne(UserModel, {id: '1'});
-
-                user.username = 'updated';
             });
 
             afterEach(async () => {
@@ -938,24 +938,70 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 }
             });
 
-            describe('read-only session with dirty models', () => {
-                it('should not throw error', async () => {
-                    await session.close('commit');
+            describe('with verifyImmutability=false', () => {
 
-                    expect(session.isReadOnly).to.be.true;
-                    expect(session.isActive).to.be.false;
+                describe('and dirty immutable models', () => {
+                    beforeEach(async () => {
+                        sOptions.readonly = false;
+                        session = db.getSession(sOptions, logger);
+        
+                        user = await session.fetchOne(UserModel, { id: '1' }, false);
+                        originalUsername = user.username;
+        
+                        user.username = 'updated';
+                    });
+    
+                    it('should not throw error', async () => {
+                        await session.close('commit');
+    
+                        expect(session.isReadOnly).to.be.false;
+                        expect(session.isActive).to.be.false;
+                    });
+    
+                    it('should not update data in the database', async () => {
+                        await session.close('commit');
+    
+                        session = db.getSession(options, logger);
+    
+                        const uUser = await session.fetchOne(UserModel, {id: user.id});
+    
+                        expect(uUser).to.not.be.undefined;
+                        expect(uUser.id).to.equal(user.id);
+                        expect(uUser.username).to.equal(originalUsername);
+                        expect(uUser.username).to.not.equal(user.username);
+                    });
                 });
 
-                it('db should not be updated after flush() method', async () => {
-                    await session.close('commit');
-
-                    session = db.getSession(options, logger);
-
-                    const uUser = await session.fetchOne(UserModel, {id: user.id});
-
-                    expect(uUser).to.not.be.undefined;
-                    expect(uUser.id).to.equal(user.id);
-                    expect(uUser.username).to.not.equal(user.username);
+                describe('and dirty models in read-only session', () => {
+                    beforeEach(async () => {
+                        sOptions.readonly = true;
+                        session = db.getSession(sOptions, logger);
+        
+                        user = await session.fetchOne(UserModel, { id: '1' }, false);
+                        originalUsername = user.username;
+        
+                        user.username = 'updated';
+                    });
+    
+                    it('should not throw error', async () => {
+                        await session.close('commit');
+    
+                        expect(session.isReadOnly).to.be.true;
+                        expect(session.isActive).to.be.false;
+                    });
+    
+                    it(`should not update data in the database`, async () => {
+                        await session.close('commit');
+    
+                        session = db.getSession(options, logger);
+    
+                        const uUser = await session.fetchOne(UserModel, {id: user.id});
+    
+                        expect(uUser).to.not.be.undefined;
+                        expect(uUser.id).to.equal(user.id);
+                        expect(uUser.username).to.equal(originalUsername);
+                        expect(uUser.username).to.not.equal(user.username);
+                    });
                 });
             });
         });

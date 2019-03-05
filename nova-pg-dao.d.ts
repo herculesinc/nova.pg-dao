@@ -38,7 +38,7 @@ declare module "@nova/pg-dao" {
 
     export interface SessionOptions {
         readonly            : boolean;
-        verifyImmutability  : boolean;  // TODO: rename to enforceImmutablity?
+        verifyImmutability  : boolean;
         logQueryText        : boolean;  // TODO: change to log level
     }
 
