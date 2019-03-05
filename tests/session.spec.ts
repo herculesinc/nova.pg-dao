@@ -795,94 +795,168 @@ describe('NOVA.PG-DAO -> Session;', () => {
         });
     });
 
-    describe('flush/close methods tests;', () => {
+    describe.only('flush/close methods tests;', () => {
         let UserModel: any;
         let created: any;
         let updated: any;
         let deleted: any;
+        let sOptions: SessionOptions;
 
         const table = 'tmp_users';
         const idGenerator = new PgIdGenerator(`${table}_id_seq`);
 
-        beforeEach(async () => {
-            db = new Database(settings);
-            session = db.getSession(options, logger);
+        describe('flush method', () => {
+            [
+                true, false
+            ].forEach(verifyImmutability => {
+                const title = verifyImmutability
+                    ? 'With \'verifyImmutability\' flag'
+                    : 'Without \'verifyImmutability\' flag';
 
-            await prepareDatabase(session);
-            await session.close('commit');
+                describe(title, () => {
+                    beforeEach(async () => {
+                        sOptions = { ...options, verifyImmutability };
+                        db = new Database(settings);
+                        session = db.getSession(sOptions, logger);
 
-            @dbModel(table, idGenerator)
-            class UModel extends Model {
-                @dbField(String)
-                username!: string;
+                        await prepareDatabase(session);
+                        await session.close('commit');
 
-                @dbField(Array)
-                tags!: string[];
-            }
+                        @dbModel(table, idGenerator)
+                        class UModel extends Model {
+                            @dbField(String)
+                            username!: string;
 
-            UserModel = UModel;
+                            @dbField(Array)
+                            tags!: string[];
+                        }
 
-            session = db.getSession(options, logger);
+                        UserModel = UModel;
 
-            const dUser = await session.fetchOne(UserModel, {id: '1'}, true);
+                        session = db.getSession(sOptions, logger);
 
-            created = await session.create(UserModel, {username: 'username', tags: [1,2]});
-            updated = await session.fetchOne(UserModel, {id: '2'}, true);
-            deleted = session.delete(dUser);
+                        const dUser = await session.fetchOne(UserModel, {id: '1'}, true);
 
-            updated.username = 'updated';
+                        created = await session.create(UserModel, {username: 'username', tags: [1,2]});
+                        updated = await session.fetchOne(UserModel, {id: '2'}, true);
+                        deleted = session.delete(dUser);
+
+                        updated.username = 'updated';
+                    });
+
+                    afterEach(async () => {
+                        if (session && session.isActive) {
+                            await session.close('commit');
+                        }
+                    });
+
+                    it('should be called without an error', async () => {
+                        await session.flush();
+                    });
+
+                    it('state of flushed models should be updated correctly', async () => {
+                        await session.flush();
+
+                        [created, updated].forEach((model: any) => {
+                            expect(model.isMutable()).to.be.true;
+                            expect(model.isCreated()).to.be.false;
+                            expect(model.isDeleted()).to.be.false;
+                            expect(model.hasChanged(verifyImmutability)).to.be.false;
+                        });
+
+                        expect(deleted.isMutable()).to.be.true;
+                        expect(deleted.isCreated()).to.be.false;
+                        expect(deleted.isDeleted()).to.be.true;
+                        expect(deleted.hasChanged()).to.be.false;
+                    });
+
+                    it('updatedOn field for updated model should be changed', async () => {
+                        const originUpdateOn = updated.updatedOn;
+
+                        await session.flush();
+
+                        expect(updated.updatedOn).to.be.greaterThan(originUpdateOn);
+                    });
+
+                    it('db should be updated after flush() method', async () => {
+                        await session.flush();
+
+                        const cUser = await session.fetchOne(UserModel, {id: created.id});
+                        const uUser = await session.fetchOne(UserModel, {id: updated.id});
+                        const dUser = await session.fetchOne(UserModel, {id: deleted.id});
+
+                        expect(cUser).to.not.be.undefined;
+                        expect(cUser.id).to.equal(created.id);
+
+                        expect(uUser).to.not.be.undefined;
+                        expect(uUser.id).to.equal(updated.id);
+                        expect(uUser.username).to.equal('updated');
+
+                        expect(dUser).to.be.undefined;
+                    });
+                });
+            });
         });
 
-        afterEach(async () => {
-            if (session && session.isActive) {
+        describe('close() method', () => {
+            let user: any;
+
+            const sOptions: SessionOptions = {
+                verifyImmutability  : false,
+                readonly            : true,
+                logQueryText        : false
+            };
+
+            beforeEach(async () => {
+                db = new Database(settings);
+                session = db.getSession(options, logger);
+
+                await prepareDatabase(session);
                 await session.close('commit');
-            }
-        });
 
-        describe('flush() method', () => {
-            it('should be called without an error', async () => {
-                await session.flush();
+                @dbModel(table, idGenerator)
+                class UModel extends Model {
+                    @dbField(String)
+                    username!: string;
+
+                    @dbField(Array)
+                    tags!: string[];
+                }
+
+                UserModel = UModel;
+
+                session = db.getSession(sOptions, logger);
+
+                user = await session.fetchOne(UserModel, {id: '1'});
+
+                user.username = 'updated';
             });
 
-            it('state of flushed models should be updated correctly', async () => {
-                await session.flush();
+            afterEach(async () => {
+                if (session && session.isActive) {
+                    await session.close('commit');
+                }
+            });
 
-                [created, updated].forEach((model: any) => {
-                    expect(model.isMutable()).to.be.true;
-                    expect(model.isCreated()).to.be.false;
-                    expect(model.isDeleted()).to.be.false;
-                    expect(model.hasChanged()).to.be.false;
+            describe('read-only session with dirty models', () => {
+                it('should not throw error', async () => {
+                    await session.close('commit');
+
+                    expect(session.isReadOnly).to.be.true;
+                    expect(session.isActive).to.be.false;
                 });
 
-                expect(deleted.isMutable()).to.be.true;
-                expect(deleted.isCreated()).to.be.false;
-                expect(deleted.isDeleted()).to.be.true;
-                expect(deleted.hasChanged()).to.be.false;
-            });
+                it('db should not be updated after flush() method', async () => {
+                    await session.close('commit');
 
-            it('updatedOn field for updated model should be changed', async () => {
-                const originUpdateOn = updated.updatedOn;
+                    session = db.getSession(options, logger);
 
-                await session.flush();
+                    const uUser = await session.fetchOne(UserModel, {id: user.id});
 
-                expect(updated.updatedOn).to.be.greaterThan(originUpdateOn);
-            });
-
-            it('db should be updated after flush() method', async () => {
-                await session.flush();
-
-                const cUser = await session.fetchOne(UserModel, {id: created.id});
-                const uUser = await session.fetchOne(UserModel, {id: updated.id});
-                const dUser = await session.fetchOne(UserModel, {id: deleted.id});
-
-                expect(cUser).to.not.be.undefined;
-                expect(cUser.id).to.equal(created.id);
-
-                expect(uUser).to.not.be.undefined;
-                expect(uUser.id).to.equal(updated.id);
-                expect(uUser.username).to.equal('updated');
-
-                expect(dUser).to.be.undefined;
+                    expect(uUser).to.not.be.undefined;
+                    expect(uUser.id).to.equal(user.id);
+                    expect(uUser.username).to.not.equal(user.username);
+                });
             });
         });
     });
@@ -1090,20 +1164,20 @@ describe('NOVA.PG-DAO -> Session;', () => {
 
             it('Attempt to connect to a non-existing database should throw an error', async () => {
                 const settings1 = JSON.parse(JSON.stringify(settings));
-    
+
                 settings1.connection.database = 'invalid';
                 settings1.connection.port = 1234;
-    
+
                 const database = new Database(settings1);
                 const eSession = database.getSession(options, logger);
-    
+
                 const query = Query.from('DROP TABLE IF EXISTS tmp_users;');
-    
+
                 await expect(eSession.execute(query)).to.eventually.be.rejectedWith(ConnectionError, 'connect ECONNREFUSED');
-    
+
                 expect(db.getPoolState().size).to.equal(1);
                 expect(db.getPoolState().idle).to.equal(0);
-    
+
                 expect(session.isActive).to.to.be.true;
             });
 
@@ -1128,53 +1202,53 @@ describe('NOVA.PG-DAO -> Session;', () => {
                 const query: any = {
                     text: undefined
                 };
-    
+
                 await expect(session.execute(query)).to.eventually.be.rejectedWith(QueryError, 'Query text must be a string');
-    
+
                 // failed query didn't create a new connection
                 expect(db.getPoolState().size).to.equal(1);
                 expect(db.getPoolState().idle).to.equal(1);
-    
+
                 expect(session.isActive).to.to.be.true;
             });
-    
+
             it('Executing a query after committing a transaction should throw an error', async () => {
                 await session.close('commit');
-    
+
                 expect(session.isActive).to.be.false;
-    
+
                 const query = Query.from('DROP TABLE IF EXISTS tmp_users;');
-    
+
                 await expect(session.execute(query)).to.eventually.be.rejectedWith(SessionError, 'Cannot execute a query: session is closed');
-    
+
                 expect(db.getPoolState().size).to.equal(1);
                 expect(db.getPoolState().idle).to.equal(1);
             });
-    
+
             it('Executing a query after rolling back a transaction should throw an error', async () => {
                 await session.close('rollback');
-    
+
                 expect(session.isActive).to.be.false;
-    
+
                 const query = Query.from('DROP TABLE IF EXISTS tmp_users;');
-    
+
                 await expect(session.execute(query)).to.eventually.be.rejectedWith(SessionError, 'Cannot execute a query: session is closed');
-    
+
                 expect(db.getPoolState().size).to.equal(1);
                 expect(db.getPoolState().idle).to.equal(1);
             });
-    
+
             it('Executing a query with invalid SQL should throw an error but keep session active', async () => {
                 const query = Query.from('SELLECT * FROM tmp_users;');
-    
+
                 await expect(session.execute(query)).to.eventually.be.rejectedWith(QueryError, `syntax error at or near "SELLECT"`);
-    
+
                 expect(db.getPoolState().size).to.equal(1);
                 expect(db.getPoolState().idle).to.equal(0);
-    
+
                 expect(session.isActive).to.to.be.true;
             });
-    
+
             it('Executing a query with invalid result parser should throw an error', async () => {
                 const query = Query.from('SELECT * FROM tmp_users WHERE id = 1;', 'error', {
                     mask: 'list',
@@ -1184,12 +1258,12 @@ describe('NOVA.PG-DAO -> Session;', () => {
                         }
                     }
                 });
-    
+
                 await expect(session.execute(query)).to.eventually.be.rejectedWith(ParseError, 'Failed to parse results');
-    
+
                 expect(db.getPoolState().size).to.equal(1);
                 expect(db.getPoolState().idle).to.equal(0);
-    
+
                 expect(session.isActive).to.to.be.true;
             });
         });
@@ -1504,7 +1578,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                     expect(session.isActive).to.be.true;
 
                     await session.create(UserModel, {username: 'username', tags: ['1', '2']});
-                    await session.close('rollback')
+                    await session.close('rollback');
 
                     expect(session.isActive).to.be.false;
 
@@ -1541,7 +1615,7 @@ describe('NOVA.PG-DAO -> Session;', () => {
                     expect(poolState.size).to.be.equal(1);
                     expect(poolState.idle).to.be.equal(0);
                 });
-                
+
             });
 
             describe('when areEqual() handler throws error', () => {
