@@ -5,7 +5,7 @@ import { Submittable, Connection, RowDescription, DataRow, CommandComplete } fro
 import { Query, QueryTextLogLevel } from '@nova/pg-dao';
 import { Result, createResult } from './results';
 import { Store } from './Store'
-import { QueryError, ParseError, ModelError } from './errors';
+import { QueryError, ParseError } from './errors';
 import * as util from './util';
 
 // MODULE VARIABLES
@@ -14,7 +14,7 @@ const COMMAND_COMPLETE_REGEX = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/;
 
 // CLASS DEFINITION
 // ================================================================================================
-export class Command implements Submittable {
+export class Request implements Submittable {
 
     private readonly id             : string;
     private readonly store          : Store;

@@ -11,7 +11,7 @@ const util = require("./util");
 const COMMAND_COMPLETE_REGEX = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/;
 // CLASS DEFINITION
 // ================================================================================================
-class Command {
+class Request {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     constructor(store, logger, source, logQueryText) {
@@ -180,7 +180,7 @@ class Command {
         this.logger.trace(this.source, command, duration, success, details);
     }
 }
-exports.Command = Command;
+exports.Request = Request;
 // HELPER FUNCTIONS
 // ================================================================================================
 function validateQueryText(text) {
@@ -215,4 +215,4 @@ function parseCommandComplete(message) {
     }
     return { command, rows };
 }
-//# sourceMappingURL=Command.js.map
+//# sourceMappingURL=Request.js.map

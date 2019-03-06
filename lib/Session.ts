@@ -3,7 +3,7 @@
 import { Dao } from '@nova/core';
 import { Model, ModelSelector, Query, SingleResultQuery, ListResultQuery, SessionOptions, Logger, TraceSource, QueryTextLogLevel } from '@nova/pg-dao';
 import { Client } from 'pg';
-import { Command } from './Command';
+import { Request } from './Request';
 import { Store } from './Store';
 import { isModelClass } from './Model';
 import { ConnectionError, SessionError } from './errors';
@@ -27,7 +27,7 @@ export class DaoSession implements Dao {
 
     private state                   : DaoState;
     private client?                 : Client;
-    private commands                : Command[];
+    private requests                : Request[];
 
     private readonly store          : Store;
     private readonly logger?        : Logger;
@@ -50,7 +50,7 @@ export class DaoSession implements Dao {
 
         this.state = DaoState.pending;
         this.client = undefined;
-        this.commands = [];
+        this.requests = [];
     }
 
     // PUBLIC ACCESSORS
@@ -257,19 +257,19 @@ export class DaoSession implements Dao {
             throw new SessionError('Cannot execute a query: session is closed');
         }
 
-        let firstCommand: Command | undefined;
+        let firstRequest: Request | undefined;
 
         // make sure sessions starts out with BEGIN statement
         if (this.state === DaoState.pending) {
-            firstCommand = this.queueFirstCommand();
+            firstRequest = this.queueFirstRequest();
             this.state = DaoState.connecting;
         }
 
-        // add query to the command
-        const result = this.appendToCommandQueue(query, firstCommand);
+        // add query to the request
+        const result = this.appendToRequestQueue(query, firstRequest);
 
         // connect to database, but only if the BEGIN statement was queued in this context
-        if (firstCommand) {
+        if (firstRequest) {
             const start = Date.now();
             try {
                 this.logger && this.logger.debug('Connecting to the database');
@@ -280,10 +280,10 @@ export class DaoSession implements Dao {
                 this.logger && this.logger.trace(this.source, 'connect', Date.now() - start, false);
                 error = new ConnectionError('Cannot execute a query: database connection failed', error);
 
-                // make all queued commands resolve to an error
+                // make all queued requests resolve to an error
                 process.nextTick(() => {
-                    for (let command of this.commands) {
-                        command.abort(error);
+                    for (let request of this.requests) {
+                        request.abort(error);
                     }
                 });
 
@@ -293,14 +293,14 @@ export class DaoSession implements Dao {
             this.state = DaoState.active;
         }
 
-        // execute the entire command queue on next tick
+        // execute the entire request queue on next tick
         if (this.state === DaoState.active) {
             process.nextTick(() => {
-                const commands = this.commands;
-                this.commands = [];
+                const requests = this.requests;
+                this.requests = [];
 
-                for (let command of commands) {
-                    this.client!.query(command as any);
+                for (let request of requests) {
+                    this.client!.query(request as any);
                 }
             });
         }
@@ -311,38 +311,38 @@ export class DaoSession implements Dao {
 
     // PRIVATE METHODS
     // --------------------------------------------------------------------------------------------
-    private queueFirstCommand(): Command {
-        // create a command and add it to the command queue
-        const command = new Command(this.store, this.logger, this.source, this.logQueryText);
-        this.commands.push(command);
+    private queueFirstRequest(): Request {
+        // create a request and add it to the request queue
+        const request = new Request(this.store, this.logger, this.source, this.logQueryText);
+        this.requests.push(request);
 
-        // add begin transaction query to the command
+        // add begin transaction query to the request
         const txStartQuery = this.readonly ? BEGIN_RO_TRANSACTION : BEGIN_RW_TRANSACTION;
-        command.add(txStartQuery).catch((error) => {
+        request.add(txStartQuery).catch((error) => {
             // TODO: log error?
         });
-        return command;
+        return request;
     }
 
-    private appendToCommandQueue(query: Query, firstCommand?: Command): Promise<any> {
+    private appendToRequestQueue(query: Query, firstRequest?: Request): Promise<any> {
         let result: any;
         if (query.values) {
-            // if parameterized query, it must start a new command
-            const command = new Command(this.store, this.logger, this.source, this.logQueryText);
-            this.commands.push(command);
-            result = command.add(query);;
+            // if parameterized query, it must start a new request
+            const request = new Request(this.store, this.logger, this.source, this.logQueryText);
+            this.requests.push(request);
+            result = request.add(query);;
         }
-        else if (firstCommand) {
-            result = firstCommand.add(query);
+        else if (firstRequest) {
+            result = firstRequest.add(query);
         }
         else {
-            // try to append the query to the last command in the queue
-            let command = this.commands[this.commands.length - 1];
-            if (!command || command.isParameterized) {
-                command = new Command(this.store, this.logger, this.source, this.logQueryText);
-                this.commands.push(command);
+            // try to append the query to the last request in the queue
+            let request = this.requests[this.requests.length - 1];
+            if (!request || request.isParameterized) {
+                request = new Request(this.store, this.logger, this.source, this.logQueryText);
+                this.requests.push(request);
             }
-            result = command.add(query);;
+            result = request.add(query);;
         }
 
         return result;
