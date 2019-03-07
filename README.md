@@ -111,12 +111,17 @@ async function updateStatus(userId: string, newStatus: number) {
 ## API Reference
 Complete public API definitions can be found in [nova-pg-dao.d.ts](https://github.com/herculesinc/nova.pg-dao/blob/master/nova-pg-dao.d.ts) file. The below sections explain in more detail how the API can be used for specific tasks:
 
-* [Obtaining database connection](#obtaining_database_connection)
-* Querying the database
-* Working with models
-  * Defining models
-  * Fetching models from the database
-  * Creating, deleting, updating models
+* [Obtaining database connection](#obtaining-database-connection)
+  * [Creating a session](#creating-a-session)
+  * [Session lifecycle](#session-lifecycle)
+* [Querying the database](#querying-the-database)
+  * [Simple Queries](#simple-queries)
+  * [Parameterized Queries](#parameterized-queries)
+  * [Result Parsing](#result-parsing)
+* [Working with models](#working-with-models)
+  * [Defining models](#defining-models)
+  * [Fetching models from the database](#fetching-models-from-the-database)
+  * [Creating, deleting, updating models](#creating-deleting-updating-models)
 * [Errors](#errors)
 
 ### Obtaining database connection
@@ -170,9 +175,9 @@ const enum QueryTextLogLevel {
 ```
 The meaning of the above options is as follows:
 
-* `readonly` - when set to "true", all queries in the session will be executed in a read-only transaction. Thus, no database mutations will be possible.
-* `verifyImmutability` - when set to "true", all models will be checked for changes before the session is closed; otherwise, only mutable models will be checked for changes. Checking all models for changes may incur a performance penalty - so, in performance-intensive applications (or in production environments), it might make sense to set this property to "false";
-* `logQueryText` - defines how query text will be sent to the `logger`; can be one of the following values:
+* **readonly** - when set to "true", all queries in the session will be executed in a read-only transaction. Thus, no database mutations will be possible.
+* **verifyImmutability** - when set to "true", all models will be checked for changes before the session is closed; otherwise, only mutable models will be checked for changes. Checking all models for changes may incur a performance penalty - so, in performance-intensive applications (or in production environments), it might make sense to set this property to "false";
+* **logQueryText** - defines how query text will be sent to the `logger`; can be one of the following values:
   * `never` - query text is never logged;
   * `onError` - query text is logged only if the query results in an error; this is the default; 
   * `always` - query text is logged for every query.
@@ -215,13 +220,96 @@ Creation of a session object does not establish a database connection. The conne
    1. A database connection is created or retrieved from the connection pool;
    2. A new transaction is started; if the session is read-only, the transaction is started using `BEGIN READ ONLY` command, otherwise it is started using `BEGIN READ WRITE` command.
 3. All subsequent calls to `Session.execute()` method execute queries in the context of the created transaction.
-4. A session must be closed using either `Session.close()` method. This method can be executed with the following parameters:
+4. A session must be closed using `Session.close()` method. This method can be executed with the following parameters:
    1. `Session.close('commit')` to commit changes to the database, or to end read-only transaction;
    2. `Session.close('rollback')` to roll back any changes sent to the database during the session.
 
 Always call the `Session.close()` method after session object is no longer needed. This will release the connection back to the pool. If you do not release the connection, the connection pool will become exhausted and bad things will happen.
 
 Do not start or end transactions manually by executing `BEGIN`, `COMMIT`, or `ROLLBACK` commands. Doing so will confuse the session and bad things may (and probably, will) happen.
+
+### Querying the database
+To execute queries against the database, you can use `Session.execute()` method like so:
+
+```TypeScript
+const results = await session.execute(query);
+```
+
+where, `query` object should have the following form:
+
+```TypeScript
+interface Query {
+    readonly text       : string;
+    readonly name?      : string;
+    readonly mask?      : 'list' | 'single';
+    readonly values?    : any[];
+    readonly handler?   : typeof Object | typeof Array | typeof Model | ResultHandler;
+}
+```
+You can create query objects directly, but it is much easier to create them using `Query.from()` and `Query.template()` methods described below. The meaning of properties in the query object is as follows:
+
+* **text** - SQL code to be executed; this is the only required property.
+* **name** - name of the query, used for logging purposes only.
+* **mask** - result mask which controls how the results are returned; can be one of the following values:
+  * `undefined` - not results will be returned (even for `SELECT` statements);
+  * `list` - result set returned as an array (an empty array if no results);
+  * `single` - the first row of the result set is returned (or `undefined` if no results).
+* **values** - an array of query parameters (for parameterized queries). These parameters can be referred to in the query text as `$1`, `$2` etc.
+* **handler** - for queries returning results, this property describes how each row should be parsed; can be one of the following values:
+  * `Object` - each row will be parsed into an object;
+  * `Array` - each row will be parsed into an array;
+  * `Model` - each row will be parsed into a model;
+  * `ResultHandler` - each row will be parsed using `Handler.parse()` method.
+  
+#### Simple Queries
+The best way to create a simple (non-parameterized) query is by using `Query.from()` method. This method has the following signatures:
+
+```TypeScript
+from(text: string): Query;
+from(text: string, name: string): Query;
+from(text: string, name: string, mask: 'list' | 'single'): Query;
+from(text: string, name: string, options: QueryOptions): Query;
+from(text: string, options: QueryOptions): Query;
+```
+
+Here are a few examples:
+```TypeScript
+// this query that will return no results
+const query1 = Query.from(`UPDATE users SET username='User1' WHERE id = 1;`);
+
+// this query will return an array of user objects
+const query2 = Query.from('SELECT * FROM users;', 'qSelectAllUsers', 'list');
+
+// this query will return an array of user rows where each row is an array
+const query4 = Query.from('SELECT * FROM users;', { mask: 'list', handler: Array });
+
+// this query will return a single user object (or undefined)
+const query3 = Query.from('SELECT * FROM users WHERE id = 1;' { mask: 'single' });
+
+```
+
+In general, the query `options` object should have the following form:
+
+```TypeScript
+interface QueryOptions {
+    readonly name?      : string;
+    readonly mask       : 'list' | 'single';
+    readonly handler?   : typeof Object | typeof Array | typeof Model | ResultHandler;
+}
+```
+As can be seen above, `mask` is the only required property for the options.
+
+#### Parameterized Queries
+
+#### Result Parsing
+
+### Working with models
+
+#### Defining models
+
+#### Fetching models from the database
+
+#### Creating, deleting, updating models
 
 ### Errors
 
