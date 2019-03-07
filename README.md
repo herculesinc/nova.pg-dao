@@ -239,22 +239,22 @@ where, `query` object should have the following form:
 
 ```TypeScript
 interface Query {
-    readonly text       : string;
-    readonly name?      : string;
-    readonly mask?      : 'list' | 'single';
-    readonly values?    : any[];
-    readonly handler?   : typeof Object | typeof Array | typeof Model | ResultHandler;
+    text        : string;
+    name?       : string;
+    mask?       : 'list' | 'single';
+    values?     : any[];
+    handler?    : typeof Object | typeof Array | typeof Model | ResultHandler;
 }
 ```
-You can create query objects directly, but it is much easier to create them using `Query.from()` and `Query.template()` methods described below. The meaning of properties in the query object is as follows:
+You can create query objects directly, but it is much easier to create them using `Query.from()` and `Query.template()` methods described in the following sections. The meaning of properties in the query object is as follows:
 
 * **text** - SQL code to be executed; this is the only required property.
 * **name** - name of the query, used for logging purposes only.
 * **mask** - result mask which controls how the results are returned; can be one of the following values:
-  * `undefined` - not results will be returned (even for `SELECT` statements);
-  * `list` - result set returned as an array (an empty array if no results);
-  * `single` - the first row of the result set is returned (or `undefined` if no results).
-* **values** - an array of query parameters (for parameterized queries). These parameters can be referred to in the query text as `$1`, `$2` etc.
+  * `undefined` - no results will be returned (even for `SELECT` statements);
+  * `list` - result set will be returned as an array (an empty array if no results);
+  * `single` - the first row of the result set will be returned (or `undefined` if no results).
+* **values** - an array of query parameters (for parameterized queries). These parameters can be referenced to in the query text as `$1`, `$2` etc.
 * **handler** - for queries returning results, this property describes how each row should be parsed; can be one of the following values:
   * `Object` - each row will be parsed into an object;
   * `Array` - each row will be parsed into an array;
@@ -265,11 +265,13 @@ You can create query objects directly, but it is much easier to create them usin
 The best way to create a simple (non-parameterized) query is by using `Query.from()` method. This method has the following signatures:
 
 ```TypeScript
-from(text: string): Query;
-from(text: string, name: string): Query;
-from(text: string, name: string, mask: 'list' | 'single'): Query;
-from(text: string, name: string, options: QueryOptions): Query;
-from(text: string, options: QueryOptions): Query;
+namespace Query {
+    from(text: string): Query;
+    from(text: string, name: string): Query;
+    from(text: string, name: string, mask: 'list' | 'single'): Query;
+    from(text: string, name: string, options: QueryOptions): Query;
+    from(text: string, options: QueryOptions): Query;
+}
 ```
 
 Here are a few examples:
@@ -284,7 +286,7 @@ const query2 = Query.from('SELECT * FROM users;', 'qSelectAllUsers', 'list');
 const query4 = Query.from('SELECT * FROM users;', { mask: 'list', handler: Array });
 
 // this query will return a single user object (or undefined)
-const query3 = Query.from('SELECT * FROM users WHERE id = 1;' { mask: 'single' });
+const query3 = Query.from('SELECT * FROM users WHERE id = 1;' { name: 'qGetUser', mask: 'single' });
 
 ```
 
@@ -292,14 +294,88 @@ In general, the query `options` object should have the following form:
 
 ```TypeScript
 interface QueryOptions {
-    readonly name?      : string;
-    readonly mask       : 'list' | 'single';
-    readonly handler?   : typeof Object | typeof Array | typeof Model | ResultHandler;
+    name?       : string;
+    mask        : 'list' | 'single';
+    handler?    : typeof Object | typeof Array | typeof Model | ResultHandler;
 }
 ```
-As can be seen above, `mask` is the only required property for the options.
+As can be seen above, `mask` is the only required property. Providing a custom `ResultHandler` allows great flexibility over [parsing query results](#result-parsing).
 
 #### Parameterized Queries
+You can create parameterized queries by using `Query.template()` method. This method return a query template, which can then be used to instantiate queries with specific parameters. `Query.template()` method has the following signatures:
+
+```TypeScript
+namespace Query {
+    template(text: string): QueryTemplate;
+    template(text: string, name: string): QueryTemplate;
+    template(text: string, name: string, mask: 'list' | 'single'): QueryTemplate;
+    template(text: string, name: string, options: QueryOptions): QueryTemplate;
+    template(text: string, options: QueryOptions): QueryTemplate;
+}
+```
+
+Here are a few examples:
+```TypeScript
+const qUpdateUser = Query.template('UPDATE users SET username={{username}} WHERE id={{id}};');
+
+const query1 = new qUpdateUser({ id: 1, username: 'joe' });
+// will be executed as: UPDATE users SET username='joe' WHERE id=1;
+
+const query2 = new qUpdateUser({ id: 2, username: `j'ane` });
+// will be executed as: UPDATE users SET username=$1 WHERE id=2; 
+// with values: ["j'ane"]
+
+const qSelectUser = Query.template('SELECT * FROM users WHERE id={{id}};', { mask: 'single' });
+
+const query3 = new qSelectUser({ id: 3 });
+// will be executed as: SELECT * FROM users WHERE id=3;
+```
+
+Within query `text`, the parameters must be enclosed withing double curly brackets `{{}}`. Safe parameters (e.g. booleans, numbers, safe strings) are inlined into the query text before the query is sent to the database. If one of the parameters is an unsafe string, the query is executed as a parameterized query on the database to avoid possibility of SQL-injection. In general, parameters are treated as follows:
+
+* **boolean** - always inlined;
+* **number** - always inlined;
+* **Date** - converted to ISO string and always inlined;
+* **string** - if the string is safe, it is inlined, otherwise the query is executed as a parameterized query;
+* **object** - object parameters are treated as follows:
+  * `valueOf()` method is called on the object and if it returns a number, a boolean, a safe string, or a date, the value is inlined; if the returned value is an unsafe string, the query is executed as parameterized query,
+  * if `valueOf()` method returns an object, the parameter is converted to string using `JSON.stringify()` and if the resulting string is safe, inlined; otherwise the query is executed as parameterized query;
+* **array** - arrays are parameterized same as objects;
+* **null** or **undefined** - always inlined as 'null';
+* **function** - functions are parameterized as follows:
+  * `valueOf()` method is called on the function, and if it returns a primitive value, the value is inlined,
+  * otherwise `QueryError` will be thrown.
+
+It is also possible to parameterize arrays of primitives in a special way to make them useful for IN clauses. This can be done by using `[[]]` brackets. In this case, the parameterization logic is as follows:
+
+* arrays of numbers are always inlined using commas as a separator;
+* arrays of strings are either inlined (if all strings are safe) or sent to the database as parameterized queries (if any of the strings is unsafe);
+* all other array types (and arrays of mixed numbers and strings) are not supported and will throw QueryError.
+
+Examples of array parametrization:
+```TypeScript
+const qSelectUsers1 = Query.template('SELECT * FROM users WHERE id IN ([[ids]]);', { mask: 'list' });
+const query1 = new qSelectUsers1({ ids: [1, 2] });
+// will be executed as: SELECT * FROM users WHERE id IN (1, 2);
+// if {{}} were used, the query would have been: SELECT * FROM users WHERE id IN ("[1,2]");
+
+const qSelectUsers2 = Query.template('SELECT * FROM users WHERE username IN ([[names]]);', { mask: 'list' });
+const query2 = new qSelectUsers2({ names: [`joe`, `j'ane`, `jill` ]});
+// will be executed as: SELECT * FROM users WHERE firstName IN ('joe',$1,'jane');
+// with values: ["j'ane"]
+```
+
+You can also forego parameter escaping by putting `~` within the parameter brackets. For example:
+```TypeScript
+const qSelectUser1 = Query.template('SELECT * FROM users WHERE id={{id}};', { mask: 'single' });
+const query1 = new qSelectUsers1({ id: '1' });
+// will be executed as: SELECT * FROM users WHERE id='1';
+
+// but
+const qSelectUsers2 = Query.template('SELECT * FROM users WHERE id={{~id}};', { mask: 'single' });
+const query2 = new qSelectUsers2({ id: '1' });
+// will be executed as: SELECT * FROM users WHERE id=1;
+```
 
 #### Result Parsing
 
