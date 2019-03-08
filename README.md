@@ -224,7 +224,7 @@ Creation of a session object does not establish a database connection. The conne
    1. `Session.close('commit')` to commit changes to the database, or to end read-only transaction;
    2. `Session.close('rollback')` to roll back any changes sent to the database during the session.
 
-Always call the `Session.close()` method after session object is no longer needed. This will release the connection back to the pool. If you do not release the connection, the connection pool will become exhausted and bad things will happen.
+Always call `Session.close()` method after session object is no longer needed. This will release the connection back to the pool. If you do not release the connection, the connection pool will become exhausted and bad things will happen.
 
 Do not start or end transactions manually by executing `BEGIN`, `COMMIT`, or `ROLLBACK` commands. Doing so will confuse the session and bad things may (and probably, will) happen.
 
@@ -254,7 +254,7 @@ You can create query objects directly, but it is much easier to create them usin
   * `undefined` - no results will be returned (even for `SELECT` statements);
   * `list` - result set will be returned as an array (an empty array if no results);
   * `single` - the first row of the result set will be returned (or `undefined` if no results).
-* **values** - an array of query parameters (for parameterized queries). These parameters can be referenced to in the query text as `$1`, `$2` etc.
+* **values** - an array of query parameters (for parameterized queries). These parameters can be referenced in the query text as `$1`, `$2` etc.
 * **handler** - for queries returning results, this property describes how each row should be parsed; can be one of the following values:
   * `Object` - each row will be parsed into an object;
   * `Array` - each row will be parsed into an array;
@@ -277,7 +277,7 @@ namespace Query {
 Here are a few examples:
 ```TypeScript
 // this query that will return no results
-const query1 = Query.from(`UPDATE users SET username='User1' WHERE id = 1;`);
+const query1 = Query.from(`UPDATE users SET username='User1' WHERE id=1;`);
 
 // this query will return an array of user objects
 const query2 = Query.from('SELECT * FROM users;', 'qSelectAllUsers', 'list');
@@ -331,7 +331,7 @@ const query3 = new qSelectUser({ id: 3 });
 // will be executed as: SELECT * FROM users WHERE id=3;
 ```
 
-Within query `text`, the parameters must be enclosed withing double curly brackets `{{}}`. Safe parameters (e.g. booleans, numbers, safe strings) are inlined into the query text before the query is sent to the database. If one of the parameters is an unsafe string, the query is executed as a parameterized query on the database to avoid possibility of SQL-injection. In general, parameters are treated as follows:
+Within query `text`, the parameters must be enclosed withing double curly brackets `{{}}`. Safe parameters (e.g. booleans, numbers, safe strings) are inlined into the query text before the query is sent to the database. If one of the parameters is an unsafe string, the query is executed as a parameterized query against the database to avoid possibility of SQL-injection. In general, parameters are treated as follows:
 
 * **boolean** - always inlined;
 * **number** - always inlined;
@@ -346,7 +346,7 @@ Within query `text`, the parameters must be enclosed withing double curly bracke
   * `valueOf()` method is called on the function, and if it returns a primitive value, the value is inlined,
   * otherwise `QueryError` will be thrown.
 
-It is also possible to parameterize arrays of primitives in a special way to make them useful for IN clauses. This can be done by using `[[]]` brackets. In this case, the parameterization logic is as follows:
+It is also possible to parameterize arrays of primitives in a special way to make them useful for `IN` clauses. This can be done by using `[[]]` brackets. In this case, the parameterization logic is as follows:
 
 * arrays of numbers are always inlined using commas as a separator;
 * arrays of strings are either inlined (if all strings are safe) or sent to the database as parameterized queries (if any of the strings is unsafe);
@@ -361,7 +361,7 @@ const query1 = new qSelectUsers1({ ids: [1, 2] });
 
 const qSelectUsers2 = Query.template('SELECT * FROM users WHERE username IN ([[names]]);', { mask: 'list' });
 const query2 = new qSelectUsers2({ names: [`joe`, `j'ane`, `jill` ]});
-// will be executed as: SELECT * FROM users WHERE firstName IN ('joe',$1,'jane');
+// will be executed as: SELECT * FROM users WHERE firstName IN ('joe', $1, 'jane');
 // with values: ["j'ane"]
 ```
 
@@ -378,10 +378,66 @@ const query2 = new qSelectUsers2({ id: '1' });
 ```
 
 #### Result Parsing
+The `Query.handler` property specifies how rows read from the database will be parsed. Standard parsing options include:
+
+* `Object` - each row will be parsed into an object;
+* `Array` - each row will be parsed into an array;
+* `Model` - each row will be parsed into a model.
+
+If you wish parse query results using custom logic, you can provide a `ResultHandler` object for a query. The handler object must have a single `parse()` method which takes a row as input and produces custom output. The interfaces for `ResultHandler` are defined below:
+
+```TypeScript
+interface ResultHandler {
+    parse(rowData: string[], fields?: FieldDescriptor[]): any;
+}
+
+interface FieldDescriptor {
+    readonly name       : string;
+    readonly oid        : number;
+    readonly parser     : FieldParser;
+}
+
+interface FieldParser {
+    (value: string): any;
+}
+```
+
+The `rowData` array contains string representations of data read from the database. The `fields` array contains field definitions for the corresponding columns. Each field definition contains a `parser` function which can be used to parse string values read from the database into their JavaScript counterparts.
+
+Here is an example of a custom parser:
+
+```TypeScript
+
+// define custom handler
+const idExtractor = {
+    parse: (row: string[]) => Number.parseInt(row[0])
+};
+
+const query = Query.from('SELECT * FROM users;', { mask: 'list', handler: idExtractor });
+// when executed, this query will return an array of numbers, rather than objects
+
+```
 
 ### Working with models
+This module provides a very flexible mechanism for defining managed models. Once the model is defined, the code takes care of synchronizing models with the database whenever changes are made. This drastically reduces the amount of boilerplate code you need to write.
 
 #### Defining models
+To define a model, you need to extend the `Model` class like so:
+
+```TypeScript
+// Define a simple model backed by 'users' table in the database
+@dbModel('users', new PgIdGenerator('users_id_seq'))
+export class User extends Model {
+    
+    // username field is expected to be a string
+    @dbField(String)
+    username: string;
+    
+    // status field is expected to be a number
+    @dbField(Number)
+    status: number;
+}
+```
 
 #### Fetching models from the database
 
