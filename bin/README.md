@@ -108,7 +108,7 @@ async function updateStatus(userId: string, newStatus: number) {
 
 ```
 
-## API Reference
+# API Reference
 Complete public API definitions can be found in [nova-pg-dao.d.ts](https://github.com/herculesinc/nova.pg-dao/blob/master/nova-pg-dao.d.ts) file. The below sections explain in more detail how the API can be used for specific tasks:
 
 * [Obtaining database connection](#obtaining-database-connection)
@@ -121,10 +121,10 @@ Complete public API definitions can be found in [nova-pg-dao.d.ts](https://githu
 * [Working with models](#working-with-models)
   * [Defining models](#defining-models)
   * [Fetching models from the database](#fetching-models-from-the-database)
-  * [Creating, deleting, updating models](#creating-deleting-updating-models)
+  * [Updating, creating, deleting models](#updating-creating-deleting-models)
 * [Errors](#errors)
 
-### Obtaining database connection
+## Obtaining database connection
 To obtain a database connection, you first need to create a `Database` object, and then call `Database.getSession()` method on it. The `Database` object can be created like so:
 
 ```TypeScript
@@ -154,7 +154,7 @@ interface DatabaseConfig {
 ```
 Creation of the database object does not establish a database connection but rather allocates a pool to hold connections to the database specified by the options object.
 
-#### Creating a session
+### Creating a session
 Once a `Database` object is created, you can use it to acquire connection sessions like so:
 
 ```TypeScript
@@ -211,7 +211,7 @@ interface TraceDetails {
 ```
 By default, a logger that writes messages to console is used. If you wish to turn logging off completely, pass `null` as the second parameter into `Database.getSession()` method.
 
-#### Session lifecycle
+### Session lifecycle
 
 Creation of a session object does not establish a database connection. The connection is established on the first call to `Session.execute()` method or its aliases. In general, a session goes through the following stages:
 
@@ -228,7 +228,7 @@ Always call `Session.close()` method after session object is no longer needed. T
 
 Do not start or end transactions manually by executing `BEGIN`, `COMMIT`, or `ROLLBACK` commands. Doing so will confuse the session and bad things may (and probably, will) happen.
 
-### Querying the database
+## Querying the database
 To execute queries against the database, you can use `Session.execute()` method like so:
 
 ```TypeScript
@@ -261,7 +261,7 @@ You can create query objects directly, but it is much easier to create them usin
   * `Model` - each row will be parsed into a model;
   * `ResultHandler` - each row will be parsed using `Handler.parse()` method.
   
-#### Simple Queries
+### Simple Queries
 The best way to create a simple (non-parameterized) query is by using `Query.from()` method. This method has the following signatures:
 
 ```TypeScript
@@ -301,7 +301,7 @@ interface QueryOptions {
 ```
 As can be seen above, `mask` is the only required property. Providing a custom `ResultHandler` allows great flexibility over [parsing query results](#result-parsing).
 
-#### Parameterized Queries
+### Parameterized Queries
 You can create parameterized queries by using `Query.template()` method. This method return a query template, which can then be used to instantiate queries with specific parameters. `Query.template()` method has the following signatures:
 
 ```TypeScript
@@ -377,7 +377,7 @@ const query2 = new qSelectUsers2({ id: '1' });
 // will be executed as: SELECT * FROM users WHERE id=1;
 ```
 
-#### Result Parsing
+### Result Parsing
 The `Query.handler` property specifies how rows read from the database will be parsed. Standard parsing options include:
 
 * `Object` - each row will be parsed into an object;
@@ -418,10 +418,10 @@ const query = Query.from('SELECT * FROM users;', { mask: 'list', handler: idExtr
 
 ```
 
-### Working with models
+## Working with models
 This module provides a very flexible mechanism for defining managed models. Once the model is defined, the module takes care of synchronizing models with the database whenever changes are made. This drastically reduces the amount of boilerplate code you need to write.
 
-#### Defining models
+### Defining models
 To define a model, you need to extend the `Model` class like so:
 
 ```TypeScript
@@ -464,7 +464,7 @@ The are a couple of other things to be aware of when defining managed models:
 * All model properties must be in *camelCase* while all corresponding database fields must be in *snake_case*. So, for example, even though `created_on` field is defined using snake case in the database, on the model, it is accessible as `createdOn` property. If you don't adhere to this convention, queries generated automatically for the model will have syntax errors and bad things will happen.
 * If you decide to override model constructor, the first thing you should do inside the constructor is to call `super(...arguments)`.
 
-##### Model decorators
+#### Model decorators
 The module provides two decorators which can be used to define a model: `@dbModel` and `@dbField`.
 
 As the name implies, `@dbModel` defines parameters for the entire model. The decorator must decorate the model class, and can accept two parameters:
@@ -486,7 +486,7 @@ As the name implies, `@dbModel` defines parameters for the entire model. The dec
   * **readonly** - a boolean flag which specifies if the field is read-only. Read-only fields are assumed to never change, and will not be synced with the database.
   * **handler** - an optional custom handler for the filed to be used to parse, compare clone, and serialize field values. Providing custom handlers is only allowed for `Object` and `Array` fields.
 
-##### Field handlers
+#### Field handlers
 Custom field handlers allow you to control all aspects of field parsing, comparing, and serialization. A filed handler must comply with the following interface:
 
 ```TypeScript
@@ -501,7 +501,7 @@ As seen from above, a field handler must supply functions for cloning and compar
 
 This mechanism can be used, for example, to encrypt specific fields in a table. In such a case, `parse()` function would be responsible for decrypting values read from the database, while `serialize()` function would be responsible for encrypting values before they are sent back to the database.
 
-##### ID generators
+#### ID generators
 As described above, models require ID generators. Such generators can be anything as long as they comply with the following interface:
 
 ```TypeScript
@@ -515,7 +515,7 @@ Out of the box, this module provides two ID Generators:
 * `GuidGenerator` which generates unique IDs using UUIDv4 format;
 * `PgIdGenerator` which takes a name of a database sequence and whenever a new ID is requested, makes a call to the database to get the next value from that sequence.
 
-##### Defining models without decorators
+#### Defining models without decorators
 If you are not using TypeScript, or if you don't want to use decorators, you can still define models like so:
 
 ```TypeScript
@@ -535,7 +535,7 @@ User.setSchema('users', new PgIdGenerator('users_id_seq'), {
 
 The above will create a `User` model identical to the model defined earlier in this section using decorators.
 
-##### Model extensions
+#### Model extensions
 You can easily add computed properties and custom methods to a model like so:
 ```TypeScript
 @dbModel('users', new PgIdGenerator('users_id_seq'))
@@ -565,11 +565,11 @@ You can also define custom synchronization logic for a model by overriding `getS
 getSyncQueries(updatedOn: number, checkReadonlyFields?: boolean): Query[] | undefined;
 ```
 
-#### Fetching models from the database
+### Fetching models from the database
 
 Fetching models from the database can be done via `Session.fetchOne()` and `Session.fetchAll()` methods or via general `Session.execute()` method.
 
-##### Fetching via fetchOne() and fetchAll()
+#### Fetching via fetchOne() and fetchAll()
 The easiest way to retrieve models of a given type from the database is by using `fetchOne()` or `fetchAll()` methods. As the names imply, `fetchOne()` returns a single model, while `fetchAll()` returns an array of models. The signatures of these methods are as follows:
 
 ```TypeScript
@@ -620,11 +620,83 @@ Currently, the following `Operators` are available:
 * `like(value)` - transformed into `LIKE value`;
 * `contains(value)` - transformed into `@> value`;
 
-##### Fetching via execute()
+#### Fetching via execute()
 
-#### Creating, deleting, updating models
+### Updating, creating, deleting models
+The module monitors models retrieved from the database or created during the session. If changes to such models are detected, they are written out to the database when the session closes, or when `Session.flush()` method is called.
 
-### Errors
+#### Updating models
+Updating models is done simply by modifying model properties. No additional works is needed:
+```TypeScript
+// retrieve user model from the database and lock it for update
+const user = await session.fetchOne(User, { id: '1'}, true);
+user.isMutable(); // true
+
+// update the model
+user.username = 'john';
+user.hasChanged(); // true
+
+// sync changes with the database
+await session.close('commit');
+```
+Note: you can updated only the models that were retrieved with the `forUpdate` parameter set to true.
+
+#### Creating models
+Creating models can be done using `Session.create()` method as follows:
+```TypeScript
+
+// create the model, id, createdOn, and updatedOn will be set automatically
+const user = await session.create({ username: 'jake', status: 1 });
+user.isCreated(); // true
+
+// sync changes with the database
+await session.close('commit');
+```
+
+#### Deleting models
+Deleting models can be done using `Session.delete()` method as follows:
+```TypeScript
+// retrieve user model from the database and lock it for update
+const user = await session.fetchOne(User, { id: '1'}, true);
+user.isMutable(); // true
+
+// delete the model
+session.delete(user);
+user.isDeleted(); // true
+
+// sync changes with the database
+await session.close('commit');
+```
+You can delete models that were retrieved with the `forUpdate` parameter set to true, or models that have been created during the same session. If you create and then delete a model, before syncing the state with the database, the actions will cancel out and no queries will be sent to the database.
+
+#### Syncing model changes
+All model changes will be either committed to the database or rolled back upon session close like so:
+* `Session.close('commit')` - will sync all pending changes with the database, and commit the session transaction.
+* `Session.close('rollback`) - will rollback any changes that were synced with the database during the session.
+
+You can also sync model changes with the database before the session close by using `Session.flush()` method like so:
+```TypeScript
+await session.flush();
+```
+Calling `Session.flush()` will write out any pending model changes to the database, but will not close the session. Keep in mind, that if close the session with `rollback` parameter, flushed changes will be rolled-back as well.
+
+#### Checking model state
+It is possible to check the state of a specific model using the following methods:
+```TypeScript
+model.isMutable()   : boolean   // true if the model was retrieved with forUpdate=true or just created
+model.isCreated()   : boolean   // true if the new model has not yet been saved to the database
+model.isDeleted()   : boolean   // true if the model has been deleted
+model.hasChanged()  : boolean   // true if mutable properties in the model have been modified
+```
+
+You can also check if a model with a given ID is currently observed by the session by using `getOne()` method like so:
+```TypeScript
+const user1 = await session.fetchOne(User, { id: '1'});
+const user2 = session.getOne(User, user1.id);
+user1 === user2; // true
+```
+
+## Errors
 
 * **ConnectionError**, thrown when:
   * establishing a database connection fails
@@ -643,7 +715,7 @@ Currently, the following `Operators` are available:
 * **ParseError**, thrown when:
   * parsing of query results fails
 
-## License
+# License
 Copyright (c) 2019 Credo360, Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
