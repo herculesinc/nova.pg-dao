@@ -419,12 +419,14 @@ const query = Query.from('SELECT * FROM users;', { mask: 'list', handler: idExtr
 ```
 
 ### Working with models
-This module provides a very flexible mechanism for defining managed models. Once the model is defined, the code takes care of synchronizing models with the database whenever changes are made. This drastically reduces the amount of boilerplate code you need to write.
+This module provides a very flexible mechanism for defining managed models. Once the model is defined, the module takes care of synchronizing models with the database whenever changes are made. This drastically reduces the amount of boilerplate code you need to write.
 
 #### Defining models
 To define a model, you need to extend the `Model` class like so:
 
 ```TypeScript
+import { Model, PgIdGenerator, dbModel, dbField } from '@nova/pg-dao';
+
 // Define a simple model backed by 'users' table in the database
 @dbModel('users', new PgIdGenerator('users_id_seq'))
 export class User extends Model {
@@ -438,6 +440,102 @@ export class User extends Model {
     status: number;
 }
 ```
+Until JavaScript supports decorators natively, you'll need to use `experimentalDecorators` compiler option for TypeScript to get the above to work. You can also define models without using decorators as [described later](#defining-models-without-decorators), but using decorators is so much more elegant!
+
+Every model must be backed by a table which should have 3 required fields (in addition to the user-defined fields). These fields are:
+* **id** - a primary key; on the JavaScript side, this field will be of string type; on the database side, this field can be backed by a `bigint`, a `text`, or a `uuid` field, depending on a type of ID generator which is used with the model.
+* **created_on** - used to store a timestamp (in milliseconds) of when the model row was created; on the JavaScript side, this field will be of number type; on the database side, it should be backed by a `bigint` field.
+* **updated_on** - used to store a timestamp (in milliseconds) of when the model was last updated; the types for this field are the same as for `updated_on`.
+
+So, the table backing the `User` model defined above can be created using the following script:
+
+```SQL
+CREATE TABLE tokens
+(
+    id              bigint PRIMARY KEY,
+    username        text NOT NULL,       
+    status          smallint NOT NULL,
+    created_on      bigint NOT NULL,
+    updated_on      bigint NOT NULL
+);
+```
+
+The are a couple of other things to be aware of when defining managed models:
+* All model properties must be in *camelCase* while all corresponding database fields must be in *snake_case*. So, for example, even though `created_on` field is defined using snake case in the database, on the model, it is accessible as `createdOn` property. If you don't adhere to this convention, queries generated automatically for the model will have syntax errors and bad things will happen.
+* If you decide to override model constructor, the first thing you should do inside the constructor is to call `super(...arguments)`.
+
+##### Model decorators
+The module provides two decorators which can be used to define a model: `@dbModel` and `@dbField`.
+
+As the name implies, `@dbModel` defines parameters for the entire model. The decorator must decorate the model class, and can accept two parameters:
+
+* **tableName** - the name of the table backing the model; this parameter is required.
+* **idGenerator** - the [ID Generator](#id-generators) which can be used by the model to generate unique IDs. This property is option and the default is `GuidGenerator`.
+
+`@dbField` decorates a specific fields. Any property not decorated with `@dbField` will not be synced with the database. The following parameters can be specified for the `@dbField` decorator:
+
+* **fieldType** - specifies the type of the field. This parameter is required. Currently the following field types are supported:
+  * **Number** - must be backed by a database field that can be parsed into a JavaScript number; for example: `smallint`, `integer`, `real`, `double`. Using 64-bit integers (i.e. `bigint` or `bigserial`) for this field type may lead to data loss, and probably is not a good idea.
+  * **Boolean** - must be backed by a database field that can be parsed into a boolean.
+  * **String** - can be backed by a database field of character type (e.g. `text`) or by any other type that can be inferred from a string (e.g. `bigint`); on the JavaScript side, values for fields of this type will be represented as strings.
+  * **Timestamp** - must be backed by a `bigint` database field; one the JavaScript side, values for fields of this type will be represented as numbers.
+  * **Date** - must be backed by a database field of date/time type; on the JavaScript side, values for fields of this type will be represented as JavaScript `Date`.
+  * **Object** - if no custom handler is provided, must be backed by `json` or `jsonb` database fields; if custom handler is provided, can be backed by pretty much anything.
+  * **Array** - same as `Object` data type.
+* **fieldOptions** - optional parameter to specify additional options for the field. Currently, the following options are supported:
+  * **readonly** - a boolean flag which specifies if the field is read-only. Read-only fields are assumed to never change, and will not be synced with the database.
+  * **handler** - an optional custom handler for the filed to be used to parse, compare clone, and serialize field values. Providing custom handlers is only allowed for `Object` and `Array` fields.
+
+##### Field handlers
+Custom field handlers allow you to control all aspects of field parsing, comparing, and serialization. A filed handler must comply with the following interface:
+
+```TypeScript
+interface FieldHandler {
+    parse?      : (value: string) => any;
+    serialize?  : (value: any) => string;
+    clone       : (value: any) => any;
+    areEqual    : (value1: any, value2: any) => boolean;
+}
+```
+As seen from above, a field handler must supply functions for cloning and comparing field values, and can optionally supply functions for parsing and serializing filed values.
+
+This mechanism can be used, for example, to encrypt specific fields in a table. In such a case, `parse()` function would be responsible for decrypting values read from the database, while `serialize()` function would be responsible for encrypting values before they are sent back to the database.
+
+##### ID generators
+As described above, models require ID generators. Such generators can be anything as long as they comply with the following interface:
+
+```TypeScript
+interface IdGenerator {
+  getNextId(logger?: Logger, session?: Session): Promise<string>;
+}
+```
+The `getNextId()` method will receive references to a `Logger` and a `Session` whenever this method is called, but an ID generator does not need to rely on these object to generate unique IDs. This approach makes it possible to generate unique IDs in a variety of ways (e.g. [distributed ID generation using redis](https://www.npmjs.com/package/@nova/id-generator)) making models even more flexible.
+
+Out of the box, this module provides two ID Generators:
+* `GuidGenerator` which generates unique IDs using UUIDv4 format;
+* `PgIdGenerator` which takes a name of a database sequence and whenever a new ID is requested, makes a call to the database to get the next value from that sequence.
+
+##### Defining models without decorators
+If you are not using TypeScript, or if you don't want to use decorators, you can still define models like so:
+
+```TypeScript
+import { Model, PgIdGenerator } from '@nova/pg-dao';
+
+class User extends Model {    
+    // nothing to do here, unless you need to override the constructor 
+    // or add custom properties
+}
+
+// no need to set id, createdOn, updatedOn fields - they will be set automatically
+User.setSchema('users', new PgIdGenerator('users_id_seq'), {
+    username: { type: String },
+    password: { type: Number }
+});
+```
+
+The above will create a `User` model identical to the model defined earlier in this section using decorators.
+
+##### Model extensions
 
 #### Fetching models from the database
 
