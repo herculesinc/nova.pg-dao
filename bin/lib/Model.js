@@ -144,7 +144,7 @@ class Model {
         }
         return false;
     }
-    // MODEL METHODS
+    // INTERNAL METHODS
     // --------------------------------------------------------------------------------------------
     infuse(rowData, dbFields, cloneReadonlyFields = true) {
         const fields = this.constructor.getSchema().fields;
@@ -173,23 +173,6 @@ class Model {
         }
         this[symOriginal] = original;
     }
-    getSyncQueries(updatedOn, checkReadonlyFields = true) {
-        if (this[exports.symCreated]) {
-            return [this.buildInsertQuery()];
-        }
-        else if (this[exports.symDeleted]) {
-            return [this.buildDeleteQuery()];
-        }
-        else {
-            const schema = this.constructor.getSchema();
-            const changes = this.getChanges(checkReadonlyFields);
-            if (changes && changes.length > 0) {
-                this.updatedOn = updatedOn;
-                changes.push(schema.getField('updatedOn'));
-                return [this.buildUpdateQuery(changes)];
-            }
-        }
-    }
     saveOriginal(cloneReadonlyFields) {
         const schema = this.constructor.getSchema();
         const original = {};
@@ -209,6 +192,28 @@ class Model {
     }
     clearOriginal() {
         this[symOriginal] = undefined;
+    }
+    // PROTECTED METHODS
+    // --------------------------------------------------------------------------------------------
+    getOriginal() {
+        return this[symOriginal];
+    }
+    getSyncQueries(updatedOn, checkReadonlyFields = true) {
+        if (this[exports.symCreated]) {
+            return [this.buildInsertQuery()];
+        }
+        else if (this[exports.symDeleted]) {
+            return [this.buildDeleteQuery()];
+        }
+        else {
+            const schema = this.constructor.getSchema();
+            const changes = this.getChanges(checkReadonlyFields);
+            if (changes && changes.length > 0) {
+                this.updatedOn = updatedOn;
+                changes.push(schema.getField('updatedOn'));
+                return [this.buildUpdateQuery(changes)];
+            }
+        }
     }
     // PRIVATE METHODS
     // --------------------------------------------------------------------------------------------

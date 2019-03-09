@@ -20,6 +20,7 @@ export class DbSchema implements IDbSchema {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
 	constructor(name: string, table: string, idGenerator: IdGenerator, fields: FieldMap) {
+		// TODO: default ID Generator to GuidGenerator
 
         // validate and set model name
         if (name === undefined) throw new TypeError('Cannot build model schema: model name is undefined');

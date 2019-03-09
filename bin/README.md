@@ -536,8 +536,91 @@ User.setSchema('users', new PgIdGenerator('users_id_seq'), {
 The above will create a `User` model identical to the model defined earlier in this section using decorators.
 
 ##### Model extensions
+You can easily add computed properties and custom methods to a model like so:
+```TypeScript
+@dbModel('users', new PgIdGenerator('users_id_seq'))
+export class User extends Model {
+    
+    @dbField(String)
+    username: string;
+    
+    @dbField(Number)
+    status: number;
+
+    // computed property
+    get isActive(): boolean {
+        return (this.status === 1);
+    }
+
+    // custom method
+    activate() {
+        this.status = 1;
+    }
+}
+```
+
+You can also define custom synchronization logic for a model by overriding `getSyncQueries()` method. This method is responsible for generating queries that need to be run against the database to synchronize model state. The method has the following signature:
+
+```TypeScript
+getSyncQueries(updatedOn: number, checkReadonlyFields?: boolean): Query[] | undefined;
+```
 
 #### Fetching models from the database
+
+Fetching models from the database can be done via `Session.fetchOne()` and `Session.fetchAll()` methods or via general `Session.execute()` method.
+
+##### Fetching via fetchOne() and fetchAll()
+The easiest way to retrieve models of a given type from the database is by using `fetchOne()` or `fetchAll()` methods. As the names imply, `fetchOne()` returns a single model, while `fetchAll()` returns an array of models. The signatures of these methods are as follows:
+
+```TypeScript
+fetchOne(type, selector, forUpdate?): Model;
+fetchAll(type, selector, forUpdate?): Model[];
+```
+
+The meaning of the parameters above is as follows:
+* **type** - class of the model to retrieve. This must be a type extending `Model` class.
+* **selector** - an object describing parameters based on which models should be selected (more info below).
+* **forUpdate** - a boolean flag indicating whether the retrieved models can be updated; the default is false. When `forUpdate` is set to true, a `SELECT` query will be executed with a `FOR UPDATE` clause. This will lock the model row in the database to prevent it from being modified by other sessions. The row will remain locked until the sessions is closed.
+
+Here are a few examples:
+```TypeScript
+import { Operators as Op } from '@nova/pg-dao';
+
+// retrieve an immutable User model where id=1
+const user1 = await session.fetchOne(User, { id: '1'});
+
+// retrieve a User model where id=2 and lock it for update
+const user2 = await session.fetchOne(User, { id: '2'}, true);
+
+// retrieve immutable user models where status=1 AND username LIKE 'j*'
+const users1 = await session.fetchAll(User, { status: 1, username: op.like('j*') });
+
+// retrieve user models where id IN ('1', '2', '3') and lock them for update
+const users2 = await session.fetchAll(User, { id: ['1', '2', '3']}, true);
+
+// retrieve immutable user models where id id=1 OR status=1
+const users2 = await session.fetchAll(User, [{ id: '1' }, { status: 1 }]);
+```
+
+The `selector` object is interpreted as follows:
+* If it is an **object**, each property name is assumed to be a *camelCase* version of the database column name, and each property value is expected to contain a filter to be applied to that column. The filters for each column are then combined using `AND` operator. Column filters can have the following forms:
+  * **array** - values of the array are put into an `IN` clause.
+  * **Operator** - these are pre-defined functions which take parameters and transform them as described in the list below.
+  * any other **object** or **value** - interpreted as strict equals operator (`eq`);
+* If it is an **array**, each value of the array is processed as an object selector (described above), and the results are joined together with the `OR` operator.
+
+Currently, the following `Operators` are available:
+* `eq(value)` - transformed into `= value`;
+* `neq(value)` - transformed into `!= value`;
+* `gt(value)` - transformed into `> value`;
+* `gte(value)` - transformed into `>= value`;
+* `lt(value)` - transformed into `< value`;
+* `lte(value)` - transformed into `<= value`;
+* `not(value)` - transformed into `IS NOT value`;
+* `like(value)` - transformed into `LIKE value`;
+* `contains(value)` - transformed into `@> value`;
+
+##### Fetching via execute()
 
 #### Creating, deleting, updating models
 

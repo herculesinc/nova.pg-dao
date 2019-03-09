@@ -1,6 +1,6 @@
 // IMPORTS
 // ================================================================================================
-import { Model as IModel, FieldDescriptor, Query, SelectAllModelsQuery, SelectOneModelQuery, IdGenerator, FieldMap, QueryMask, SaveOriginalMethod } from '@nova/pg-dao';
+import { FieldDescriptor, Query, SelectAllModelsQuery, SelectOneModelQuery, IdGenerator, FieldMap, QueryMask, SaveOriginalMethod } from '@nova/pg-dao';
 import { DbSchema, DbField, SelectModelQuery, InsertModelQuery, UpdateModelQuery, DeleteModelQuery, queries } from './schema';
 import { ModelError } from './errors';
 
@@ -31,7 +31,7 @@ export function isModelClass(modelClass: any): modelClass is typeof Model {
 
 // CLASS DEFINITION
 // ================================================================================================
-export class Model implements IModel {
+export class Model {
 
     private static schema   : DbSchema;
 
@@ -123,8 +123,8 @@ export class Model implements IModel {
         this.schema = schema;
 
         // build query templates
-        this.qSelectAllModels = queries.buildSelectQueryClass(schema, 'list', this);
-        this.qSelectOneModel = queries.buildSelectQueryClass(schema, 'single', this);
+        this.qSelectAllModels = queries.buildSelectQueryClass(schema, 'list', this as any);
+        this.qSelectOneModel = queries.buildSelectQueryClass(schema, 'single', this as any);
         this.qInsertModel = queries.buildInsertQueryClass(schema);
         this.qUpdateModel = queries.buildUpdateQueryClass(schema);
         this.qDeleteModel = queries.buildDeleteQueryClass(schema);
@@ -175,7 +175,7 @@ export class Model implements IModel {
         return false;
     }
 
-    // MODEL METHODS
+    // INTERNAL METHODS
     // --------------------------------------------------------------------------------------------
     infuse(rowData: string[], dbFields: FieldDescriptor[], cloneReadonlyFields = true) {
         const fields = (this.constructor as typeof Model).getSchema().fields;
@@ -204,24 +204,6 @@ export class Model implements IModel {
         this[symOriginal] = original;
     }
 
-    getSyncQueries(updatedOn: number, checkReadonlyFields = true): Query[] | undefined {
-        if (this[symCreated]) {
-            return [this.buildInsertQuery()];
-        }
-        else if (this[symDeleted]) {
-            return [this.buildDeleteQuery()];
-        }
-        else {
-            const schema = (this.constructor as typeof Model).getSchema();
-            const changes = this.getChanges(checkReadonlyFields);
-            if (changes && changes.length > 0) {
-                this.updatedOn = updatedOn;
-                changes.push(schema.getField('updatedOn')!);
-                return [this.buildUpdateQuery(changes)];
-            }
-        }
-    }
-
     saveOriginal(cloneReadonlyFields: boolean) {
         const schema = (this.constructor as typeof Model).getSchema();
         const original: any = {};
@@ -243,6 +225,30 @@ export class Model implements IModel {
 
     clearOriginal() {
         this[symOriginal] = undefined;
+    }
+
+    // PROTECTED METHODS
+    // --------------------------------------------------------------------------------------------
+    getOriginal() {
+        return this[symOriginal];
+    }
+
+    getSyncQueries(updatedOn: number, checkReadonlyFields = true): Query[] | undefined {
+        if (this[symCreated]) {
+            return [this.buildInsertQuery()];
+        }
+        else if (this[symDeleted]) {
+            return [this.buildDeleteQuery()];
+        }
+        else {
+            const schema = (this.constructor as typeof Model).getSchema();
+            const changes = this.getChanges(checkReadonlyFields);
+            if (changes && changes.length > 0) {
+                this.updatedOn = updatedOn;
+                changes.push(schema.getField('updatedOn')!);
+                return [this.buildUpdateQuery(changes)];
+            }
+        }
     }
 
     // PRIVATE METHODS

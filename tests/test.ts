@@ -1,9 +1,9 @@
 // IMPORTS
 // ================================================================================================
-import { Database, Query } from '../index';
-import { ListResultQueryOptions, SingleResultQueryOptions, ResultHandler, FieldHandler, QueryTextLogLevel } from '@nova/pg-dao';
-import { Model } from '../lib/Model';
-import { dbModel, dbField, PgIdGenerator, GuidGenerator, Operators as Op } from '../lib/schema';
+import { Database, Query, Model as ModelClass, dbModel, dbField, PgIdGenerator, Operators as Op } from '../index';
+import { Model as ModelType, ListResultQueryOptions, SingleResultQueryOptions, ResultHandler, FieldHandler, QueryTextLogLevel } from '@nova/pg-dao';
+
+const Model: typeof ModelType = ModelClass as any;
 
 // MODULE VARIABLES
 // ================================================================================================
@@ -133,7 +133,7 @@ const database = new Database({
 
     const session = database.getSession({ logQueryText: QueryTextLogLevel.onError });
 
-    const query1 = Query.from('SELECT id FROM tokens LIMIT 5;', { name: 'query1', mask: 'list', handler: IdHandler })
+    const query1 = Query.from('SELECT id FROM tokens LIMIT 5;', { name: 'query1', mask: 'list', handler: IdHandler });
     const result1 = session.execute(query1);
 
     const query2 = Query.from('SELECT status FROM tokens LIMIT 5;', 'query2', { mask: 'list' })
