@@ -577,10 +577,12 @@ fetchOne(type, selector, forUpdate?): Model;
 fetchAll(type, selector, forUpdate?): Model[];
 ```
 
-The meaning of the parameters above is as follows:
+The meaning of the above parameters is as follows:
 * **type** - class of the model to retrieve. This must be a type extending `Model` class.
-* **selector** - an object describing parameters based on which models should be selected (more info below).
-* **forUpdate** - a boolean flag indicating whether the retrieved models can be updated; the default is false. When `forUpdate` is set to true, a `SELECT` query will be executed with a `FOR UPDATE` clause. This will lock the model row in the database to prevent it from being modified by other sessions. The row will remain locked until the sessions is closed.
+* **selector** - describes which models should be retrieved as follows:
+  * If `selector` is an object, each property name is assumed to be a *camelCase* version of the database column name, and each property value is expected to contain a [filter](#field-filters) to be applied to that column. The filters for each column are then combined using `AND` operator.
+  * If `selector` is an array, each value of the array is processed as an object selector (described above), and the results are joined together using `OR` operator.
+* **forUpdate** - a boolean flag indicating whether the retrieved models can be updated; the default is false. When `forUpdate` is set to true, a `SELECT` query will be executed with a `FOR UPDATE` clause. This will lock model rows in the database to prevent them from being modified by other sessions. The row will remain locked until the sessions is closed.
 
 Here are a few examples:
 ```TypeScript
@@ -602,28 +604,41 @@ const users2 = await session.fetchAll(User, { id: ['1', '2', '3']}, true);
 const users2 = await session.fetchAll(User, [{ id: '1' }, { status: 1 }]);
 ```
 
-The `selector` object is interpreted as follows:
-* If it is an **object**, each property name is assumed to be a *camelCase* version of the database column name, and each property value is expected to contain a filter to be applied to that column. The filters for each column are then combined using `AND` operator. Column filters can have the following forms:
-  * **array** - values of the array are put into an `IN` clause.
-  * **Operator** - these are pre-defined functions which take parameters and transform them as described in the list below.
-  * any other **object** or **value** - interpreted as strict equals operator (`eq`);
-* If it is an **array**, each value of the array is processed as an object selector (described above), and the results are joined together with the `OR` operator.
+##### Filed filters
+Field filters specify conditions to be applied to a model field. They can be defined using `Operators`. For example:
+
+```TypeScript
+{
+    id: Operators.eq('1'),          // resolves to: id='1'
+    id: Operators.in(['1', '2']),   // resolves to: id IN ('1', '2')
+    id: Operators.lt('10')          // resolves to: id < '10'
+}
+```
 
 Currently, the following `Operators` are available:
-* `eq(value)` - transformed into `= value`;
-* `neq(value)` - transformed into `!= value`;
-* `gt(value)` - transformed into `> value`;
-* `gte(value)` - transformed into `>= value`;
-* `lt(value)` - transformed into `< value`;
-* `lte(value)` - transformed into `<= value`;
-* `not(value)` - transformed into `IS NOT value`;
-* `like(value)` - transformed into `LIKE value`;
-* `contains(value)` - transformed into `@> value`;
+* `eq(value)` - resolves to `= value`;
+* `neq(value)` - resolves to `!= value`;
+* `gt(value)` - resolves to `> value`;
+* `gte(value)` - resolves to `>= value`;
+* `lt(value)` - resolves to `< value`;
+* `lte(value)` - resolves to `<= value`;
+* `not(value)` - resolves to `IS NOT value`;
+* `like(value)` - resolves to `LIKE value`;
+* `contains(value)` - resolves to `@> value`;
+* `in(values)` - resolves to `IN (...values)`;
+
+For `eq` and `in` operators, you can also use short-hands like so:
+```TypeScript
+{
+    id: '1',        // also resolves to: id='1'
+    id: ['1', '2']  // also resolves to: id IN ('1', '2')
+}
+```
 
 #### Fetching via execute()
 
 ### Updating, creating, deleting models
-The module monitors models retrieved from the database or created during the session. If changes to such models are detected, they are written out to the database when the session closes, or when `Session.flush()` method is called.
+The module monitors models retrieved from the database and created during the session. If changes to such models are detected, they are written out to the database when the session closes, or when `Session.flush()` method is called.
 
 #### Updating models
 Updating models is done simply by modifying model properties. No additional works is needed:
@@ -642,16 +657,16 @@ await session.close('commit');
 Note: you can updated only the models that were retrieved with the `forUpdate` parameter set to true.
 
 #### Creating models
-Creating models can be done using `Session.create()` method as follows:
+Creating new models can be done using `Session.create()` method as follows:
 ```TypeScript
-
-// create the model, id, createdOn, and updatedOn will be set automatically
+// create a new model
 const user = await session.create({ username: 'jake', status: 1 });
 user.isCreated(); // true
 
 // sync changes with the database
 await session.close('commit');
 ```
+Note: `id`, `createdOn`, and `updatedOn` properties will be set automatically.
 
 #### Deleting models
 Deleting models can be done using `Session.delete()` method as follows:
@@ -667,18 +682,20 @@ user.isDeleted(); // true
 // sync changes with the database
 await session.close('commit');
 ```
-You can delete models that were retrieved with the `forUpdate` parameter set to true, or models that have been created during the same session. If you create and then delete a model, before syncing the state with the database, the actions will cancel out and no queries will be sent to the database.
+You can delete models that were retrieved with the `forUpdate` parameter set to true and models that have been created during the same session. If you create and then delete a model, before syncing the state with the database, the actions will cancel out and no commands will be sent to the database.
+
+Note: deleting models deletes them from the database permanently.
 
 #### Syncing model changes
 All model changes will be either committed to the database or rolled back upon session close like so:
-* `Session.close('commit')` - will sync all pending changes with the database, and commit the session transaction.
+* `Session.close('commit')` - will sync all pending changes with the database and commit session transaction.
 * `Session.close('rollback`) - will rollback any changes that were synced with the database during the session.
 
 You can also sync model changes with the database before the session close by using `Session.flush()` method like so:
 ```TypeScript
 await session.flush();
 ```
-Calling `Session.flush()` will write out any pending model changes to the database, but will not close the session. Keep in mind, that if close the session with `rollback` parameter, flushed changes will be rolled-back as well.
+Calling `Session.flush()` will write out any pending model changes to the database, but will not close the session. Keep in mind, that if you close the session with `rollback` parameter, flushed changes will be rolled-back as well.
 
 #### Checking model state
 It is possible to check the state of a specific model using the following methods:
@@ -689,11 +706,22 @@ model.isDeleted()   : boolean   // true if the model has been deleted
 model.hasChanged()  : boolean   // true if mutable properties in the model have been modified
 ```
 
-You can also check if a model with a given ID is currently observed by the session by using `getOne()` method like so:
+You can also check if a model with a given ID is currently monitored by the session by using `getOne()` method like so:
 ```TypeScript
 const user1 = await session.fetchOne(User, { id: '1'});
 const user2 = session.getOne(User, user1.id);
 user1 === user2; // true
+
+```
+If you delete a model and the call `Session.flush()` method, the deleted model will no longer be monitored by the session;
+
+```TypeScript
+const user1 = await session.fetchOne(User, { id: '1'}, true);
+session.delete(user1);
+await session.flush();
+
+const user2 = session.getOne(User, user1.id);
+user2 === undefined; // true
 ```
 
 ## Errors

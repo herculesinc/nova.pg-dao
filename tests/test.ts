@@ -113,7 +113,7 @@ class Token extends Model {
             status: Op.lte(5) 
         }
     ]).text);
-
+    console.log(new qSelectTokens(false, { id: Op.in(['1', '2']) }).text);
 });
 
 // DATABASE TESTS
