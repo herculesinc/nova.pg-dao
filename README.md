@@ -33,12 +33,12 @@ async function runQueries() {
 
         // create and execute simple query
         const query1 = Query.from('SELECT * FROM users;', { name: 'qGetAllUsers', mask: 'list' });
-        const users = await session.execute(query1);
+        const users = await dao.execute(query1);
 
         // create and execute parameterized query
         const qSelectUsers = Query.template('SELECT * from users WHERE status={{status}}', { mask: 'list' } );
         const query2 = new qSelectUsers({ status: 'active' });
-        const activeUsers = await session.execute(query2);
+        const activeUsers = await dao.execute(query2);
 
         // close the session
         await dao.close('commit');
@@ -135,19 +135,19 @@ where, `config` should have the following form:
 
 ```TypeScript
 interface DatabaseConfig {
-    name?               : string;   // defaults to 'database', used for logging
-    connection: {                   // required connection settings
+    name?               : string;           // defaults to 'database', used for logging
+    connection: {                           // required connection settings
         host            : string;
-        port?           : number;   // optional, default 5432
-        ssl?            : boolean;  // optional, default false
+        port?           : number;           // optional, default 5432
+        ssl?            : boolean;          // optional, default false
         user            : string;
         password        : string;
         database        : string;
     };
-    pool?: {                        // optional connection pool settings
-        maxSize?        : number;   // defaults to 20   
-        idleTimeout?    : number;   // defaults to 30000 milliseconds
-        reapInterval?   : number;   // defaults to 1000 milliseconds
+    pool?: {                                // optional connection pool settings
+        maxSize?        : number;           // defaults to 20   
+        idleTimeout?    : number;           // defaults to 30000 milliseconds
+        reapInterval?   : number;           // defaults to 1000 milliseconds
     };
     session?            : SessionConfig;    // optional, described below
 }
@@ -227,6 +227,28 @@ Creation of a session object does not establish a database connection. The conne
 Always call `Session.close()` method after session object is no longer needed. This will release the connection back to the pool. If you do not release the connection, the connection pool will become exhausted and bad things will happen.
 
 Do not start or end transactions manually by executing `BEGIN`, `COMMIT`, or `ROLLBACK` commands. Doing so will confuse the session and bad things may (and probably, will) happen.
+
+#### Checking session state
+You can check session state using `Session.isActive` and `Session.inTransaction` properties like so:
+```TypeScript
+// create a session object
+const dao = db.getSession({ readonly: true });
+dao.isActive        // true
+dao.inTransaction   // false
+
+// execute a query
+const query1 = Query.from('SELECT * FROM users;', { name: 'qGetAllUsers', mask: 'list' });
+const users = await dao.execute(query1);
+dao.isActive        // true
+dao.inTransaction   // true
+
+// close the session
+await dao.close('commit');
+dao.isActive        // false
+dao.inTransaction   // false
+```
+
+You can also check whether a session is read only using `Session.isReadonly` property.
 
 ## Querying the database
 To execute queries against the database, you can use `Session.execute()` method like so:
@@ -419,7 +441,7 @@ const query = Query.from('SELECT * FROM users;', { mask: 'list', handler: idExtr
 ```
 
 ## Working with models
-This module provides a very flexible mechanism for defining managed models. Once the model is defined, the module takes care of synchronizing models with the database whenever changes are made. This drastically reduces the amount of boilerplate code you need to write.
+This module provides a very flexible mechanism for defining managed models. Once a model is defined, the module takes care of synchronizing it with the database whenever changes are made. This drastically reduces the amount of boilerplate code you need to write.
 
 ### Defining models
 To define a model, you need to extend the `Model` class like so:
@@ -442,10 +464,10 @@ export class User extends Model {
 ```
 Until JavaScript supports decorators natively, you'll need to use `experimentalDecorators` compiler option for TypeScript to get the above to work. You can also define models without using decorators as [described later](#defining-models-without-decorators), but using decorators is so much more elegant!
 
-Every model must be backed by a table which should have 3 required fields (in addition to the user-defined fields). These fields are:
+Every model must be backed by a table which, in addition to user-defined fields, must have 3 required fields. These fields are:
 * **id** - a primary key; on the JavaScript side, this field will be of string type; on the database side, this field can be backed by a `bigint`, a `text`, or a `uuid` field, depending on a type of ID generator which is used with the model.
-* **created_on** - used to store a timestamp (in milliseconds) of when the model row was created; on the JavaScript side, this field will be of number type; on the database side, it should be backed by a `bigint` field.
-* **updated_on** - used to store a timestamp (in milliseconds) of when the model was last updated; the types for this field are the same as for `updated_on`.
+* **created_on** - stores a timestamp (in milliseconds) of when the model row was created; on the JavaScript side, this field will be of number type; on the database side, it should be backed by a `bigint` field.
+* **updated_on** - stores a timestamp (in milliseconds) of when the model was last updated; the types for this field are the same as for `updated_on`.
 
 So, the table backing the `User` model defined above can be created using the following script:
 
@@ -460,8 +482,8 @@ CREATE TABLE tokens
 );
 ```
 
-The are a couple of other things to be aware of when defining managed models:
-* All model properties must be in *camelCase* while all corresponding database fields must be in *snake_case*. So, for example, even though `created_on` field is defined using snake case in the database, on the model, it is accessible as `createdOn` property. If you don't adhere to this convention, queries generated automatically for the model will have syntax errors and bad things will happen.
+The are a couple of things to be aware of when defining managed models:
+* All model properties must be in *camelCase* while all corresponding database fields must be in *snake_case*. So, for example, even though `created_on` field is defined using snake case in the database, on the model, it is accessible as `createdOn` property. If you don't adhere to this convention, queries generated automatically for your models will have syntax errors and bad things will happen.
 * If you decide to override model constructor, the first thing you should do inside the constructor is to call `super(...arguments)`.
 
 #### Model decorators
@@ -470,7 +492,7 @@ The module provides two decorators which can be used to define a model: `@dbMode
 As the name implies, `@dbModel` defines parameters for the entire model. The decorator must decorate the model class, and can accept two parameters:
 
 * **tableName** - the name of the table backing the model; this parameter is required.
-* **idGenerator** - the [ID Generator](#id-generators) which can be used by the model to generate unique IDs. This property is option and the default is `GuidGenerator`.
+* **idGenerator** - the [ID Generator](#id-generators) which can be used to generate unique IDs for new instances of the model. This property is option and the default is `GuidGenerator`.
 
 `@dbField` decorates a specific fields. Any property not decorated with `@dbField` will not be synced with the database. The following parameters can be specified for the `@dbField` decorator:
 
@@ -478,16 +500,16 @@ As the name implies, `@dbModel` defines parameters for the entire model. The dec
   * **Number** - must be backed by a database field that can be parsed into a JavaScript number; for example: `smallint`, `integer`, `real`, `double`. Using 64-bit integers (i.e. `bigint` or `bigserial`) for this field type may lead to data loss, and probably is not a good idea.
   * **Boolean** - must be backed by a database field that can be parsed into a boolean.
   * **String** - can be backed by a database field of character type (e.g. `text`) or by any other type that can be inferred from a string (e.g. `bigint`); on the JavaScript side, values for fields of this type will be represented as strings.
-  * **Timestamp** - must be backed by a `bigint` database field; one the JavaScript side, values for fields of this type will be represented as numbers.
+  * **Timestamp** - must be backed by a `bigint` database field; on the JavaScript side, values for fields of this type will be represented as numbers.
   * **Date** - must be backed by a database field of date/time type; on the JavaScript side, values for fields of this type will be represented as JavaScript `Date`.
   * **Object** - if no custom handler is provided, must be backed by `json` or `jsonb` database fields; if custom handler is provided, can be backed by pretty much anything.
   * **Array** - same as `Object` data type.
 * **fieldOptions** - optional parameter to specify additional options for the field. Currently, the following options are supported:
   * **readonly** - a boolean flag which specifies if the field is read-only. Read-only fields are assumed to never change, and will not be synced with the database.
-  * **handler** - an optional custom handler for the filed to be used to parse, compare clone, and serialize field values. Providing custom handlers is only allowed for `Object` and `Array` fields.
+  * **handler** - an optional custom handler for the field to be used to parse, compare clone, and serialize field values. Providing custom handlers is only allowed for `Object` and `Array` fields.
 
 #### Field handlers
-Custom field handlers allow you to control all aspects of field parsing, comparing, and serialization. A filed handler must comply with the following interface:
+Custom field handlers allow you to control all aspects of field parsing, comparing, and serialization. A field handler must comply with the following interface:
 
 ```TypeScript
 interface FieldHandler {
@@ -497,7 +519,7 @@ interface FieldHandler {
     areEqual    : (value1: any, value2: any) => boolean;
 }
 ```
-As seen from above, a field handler must supply functions for cloning and comparing field values, and can optionally supply functions for parsing and serializing filed values.
+As seen from above, a field handler must supply functions for cloning and comparing field values, and can optionally supply functions for parsing and serializing field values.
 
 This mechanism can be used, for example, to encrypt specific fields in a table. In such a case, `parse()` function would be responsible for decrypting values read from the database, while `serialize()` function would be responsible for encrypting values before they are sent back to the database.
 
@@ -523,7 +545,7 @@ import { Model, PgIdGenerator } from '@nova/pg-dao';
 
 class User extends Model {    
     // nothing to do here, unless you need to override the constructor 
-    // or add custom properties
+    // or add computed properties
 }
 
 // no need to set id, createdOn, updatedOn fields - they will be set automatically
@@ -559,10 +581,95 @@ export class User extends Model {
 }
 ```
 
-You can also define custom synchronization logic for a model by overriding `getSyncQueries()` method. This method is responsible for generating queries that need to be run against the database to synchronize model state. The method has the following signature:
+You can also define custom synchronization logic for a model by overriding `getSyncQueries()` method. This method is responsible for generating queries that are run against the database to synchronize model state. The method has the following signature:
 
 ```TypeScript
 getSyncQueries(updatedOn: number, checkReadonlyFields?: boolean): Query[] | undefined;
+```
+
+Here is an example of how overriding this method can be used to update a different table when a model synchronizes:
+```TypeScript
+@dbModel('users', new PgIdGenerator('users_id_seq'))
+export class User extends Model {
+    
+    @dbField(String)
+    username: string;
+    
+    @dbField(Number)
+    status: number;
+
+    getSyncQueries(updatedOn: number, checkReadonlyFields?: boolean): Query[] | undefined {
+        // call the base method to generate standard sync queries
+        const queries = super.getSyncQueries(updatedOn, checkReadonlyFields);
+
+        // get an object containing original values for all fields
+        const original = this.getOriginal();
+
+        if (original) {
+            if (this.status === 1 && original.status != 1) {
+                // if the user became active, add its ID to active_users table
+                queries.push(Query.from(`INSERT INTO active_users (user_id) VALUES (${this.id});`));
+            }
+            else if (this.status != 1 && original.status === 1) {
+                // if the user became inactive, delete its id from active_users table
+                queries.push(Query.from(`DELETE FROM active_users WHERE id = ${this.id};`));
+            }
+        }
+
+        return queries;
+    }
+}
+```
+The above example makes use of the following:
+* It uses `super.getSyncQueries()` method to generate queries using standard model sync logic. You are not required to call this method, but if you don't, you'll need to:
+  * Check all models fields for changes yourself and generate appropriate queries to sync these changes;
+  * Update `updatedOn` field for the model yourself to the value passed in as `updatedOn` parameter.
+* It uses `Model.getOriginal()` method to get state of the model at the time when it was read from the database. Keep in mind, that if a session is created with `verifyImmutability` flag set to false, original values for read-only fields will not be stored.
+* It appends additional queries to the queries generated by the base `getSyncQueries()` method when needed. These queries will be run against the database when model changes are flushed.
+
+Because `Model.getSyncQueries()` method is run just before model changes are flushed to the database, you can also use it to validate model state like so:
+```TypeScript
+@dbModel('users', new PgIdGenerator('users_id_seq'))
+export class User extends Model {
+    
+    @dbField(String)
+    username: string;
+    
+    @dbField(Number)
+    status: number;
+
+    getSyncQueries(updatedOn: number, checkReadonlyFields?: boolean): Query[] | undefined {
+        // validate model state
+        if (this.username.length > 25) {
+            throw new Error('Username is too long!');
+        }
+
+        // return queries generated using standard sync logic
+        return super.getSyncQueries(updatedOn, checkReadonlyFields);
+    }
+}
+```
+
+It is not recommended, but if you really need to you can also override model constructor. Just remember to pass all the arguments to the base constructor like so:
+```TypeScript
+@dbModel('users', new PgIdGenerator('users_id_seq'))
+export class User extends Model {
+    
+    @dbField(String)
+    username: string;
+    
+    @dbField(Number)
+    status: number;
+
+    constructor() {
+        // call base constructor
+        super(...arguments);
+
+        // some custom initialization logic here;
+        // you can assume that all fields have been initialized
+        // but mutable flag has not yet been set
+    }
+}
 ```
 
 ### Fetching models from the database
