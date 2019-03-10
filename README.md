@@ -118,6 +118,7 @@ Complete public API definitions can be found in [nova-pg-dao.d.ts](https://githu
   * [Simple Queries](#simple-queries)
   * [Parameterized Queries](#parameterized-queries)
   * [Result Parsing](#result-parsing)
+  * [Query batching](#query-batching)
 * [Working with models](#working-with-models)
   * [Defining models](#defining-models)
   * [Fetching models from the database](#fetching-models-from-the-database)
@@ -191,22 +192,8 @@ interface Logger {
     warn(message: string)   : void;
     error(error: Error)     : void;
 
-    trace(source: TraceSource, command: string, duration: number, success: boolean, details?: TraceDetails): void;
-    trace(source: TraceSource, command: TraceCommand, duration: number, success: boolean, details?: TraceDetails): void;
-}
-
-interface TraceSource {
-    readonly name   : string;
-    readonly type   : string;
-}
-
-interface TraceCommand {
-    readonly name   : string;
-    readonly text?  : string;
-}
-
-interface TraceDetails {
-    [key: string]: string;
+    trace(source: TraceSource, command: string, duration: number, success: boolean): void;
+    trace(source: TraceSource, command: TraceCommand, duration: number, success: boolean): void;
 }
 ```
 By default, a logger that writes messages to console is used. If you wish to turn logging off completely, pass `null` as the second parameter into `Database.getSession()` method.
@@ -429,7 +416,6 @@ The `rowData` array contains string representations of data read from the databa
 Here is an example of a custom parser:
 
 ```TypeScript
-
 // define custom handler
 const idExtractor = {
     parse: (row: string[]) => Number.parseInt(row[0])
@@ -437,8 +423,35 @@ const idExtractor = {
 
 const query = Query.from('SELECT * FROM users;', { mask: 'list', handler: idExtractor });
 // when executed, this query will return an array of numbers, rather than objects
-
 ```
+
+### Query batching
+If you execute multiple queries in a row without waiting for results, the queries will be sent to the database in a single request, when possible. For example:
+```TypeScript
+// define queries
+const query1 = Query.from('SELECT * FROM users WHERE id=1;', { mask: 'single' });
+const query2 = Query.from('SELECT * FROM users WHERE id=2;', { mask: 'single' });
+const query3 = Query.from('SELECT * FROM users WHERE id=3;', { mask: 'single' });
+
+// execute queries one after another without 'await'
+const result1 = session.execute(query1);
+const result2 = session.execute(query2);
+const result3 = session.execute(query3);
+
+// wait for results here
+const users = await Promise.all([result1, result2, result3]);
+```
+In the above example, all 3 quires will be combined and sent to the database as a single query:
+
+ ```SQL
+ SELECT * FROM users WHERE id=1;
+ SELECT * FROM users WHERE id=2;
+ SELECT * FROM users WHERE id=3;
+ ```
+
+Batching of queries is possible under the following conditions:
+* No asynchronous code is executed between calls to `Session.execute()` method;
+* None of the queries in a batch results in a parameterized query request (parameterized query requests cannot be batched with other queries).
 
 ## Working with models
 This module provides a very flexible mechanism for defining managed models. Once a model is defined, the module takes care of synchronizing it with the database whenever changes are made. This drastically reduces the amount of boilerplate code you need to write.
@@ -770,6 +783,26 @@ Within the class constructor, you should call `super()` method with a parameter 
 * Define parameterization values for the query by setting `this.values` property.
 
 Note, that if you define `values` for the query, the values must be in an array, and you'll need to use `$1`, `$2` etc. notation to reference them from within your custom `WHERE` clause.
+
+#### Loading models from other sources
+You can also load the models directly into session storage and make them appear as if they were loaded from the database. This may come in handy when you cache models somewhere else (e.g. redis cache) to reduce database load. Loading models can be done like so:
+
+```TypeScript
+// get model data from the caching system
+const userData = await cache.get(modelId);
+
+// create a User model
+const user = new User(userData);
+
+// load the model into the session
+session.load(user);
+user.isMutable(); // false
+user.isCreated(); // false
+
+const user2 = session.getOne(user.id);
+user === user2; // true
+```
+In the above example, it is assumed that `userData` has the same fields as `User` model;
 
 ### Updating, creating, deleting models
 The module monitors models retrieved from the database and created during the session. If changes to such models are detected, they are written out to the database when the session closes, or when `Session.flush()` method is called.

@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const schema_1 = require("./schema");
 const errors_1 = require("./errors");
+const idGenerators_1 = require("./schema/idGenerators");
 // MODULE VARIABLES
 // ================================================================================================
 exports.symMutable = Symbol('mutable');
@@ -90,11 +91,19 @@ class Model {
             throw new TypeError(`Cannot get SelectQuery template for ${this.name} model: mask '${mask}' is invalid`);
         }
     }
-    static setSchema(tableName, idGenerator, fields) {
+    static setSchema(tableName, idGeneratorOrFields, fields) {
         // create and set schema
         const modelName = this.name;
         if (this.schema)
             throw new errors_1.ModelError(`Cannot set model schema: schema for ${modelName} model has already been set`);
+        let idGenerator;
+        if (!fields) {
+            idGenerator = idGenerators_1.guidGenerator;
+            fields = idGeneratorOrFields;
+        }
+        else {
+            idGenerator = idGeneratorOrFields;
+        }
         const schema = new schema_1.DbSchema(modelName, tableName, idGenerator, fields);
         this.schema = schema;
         // build query templates

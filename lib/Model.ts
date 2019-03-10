@@ -3,6 +3,7 @@
 import { FieldDescriptor, Query, SelectAllModelsQuery, SelectOneModelQuery, IdGenerator, FieldMap, QueryMask, SaveOriginalMethod } from '@nova/pg-dao';
 import { DbSchema, DbField, SelectModelQuery, InsertModelQuery, UpdateModelQuery, DeleteModelQuery, queries } from './schema';
 import { ModelError } from './errors';
+import { guidGenerator } from './schema/idGenerators';
 
 // MODULE VARIABLES
 // ================================================================================================
@@ -115,10 +116,20 @@ export class Model {
         }
     }
 
-    static setSchema(tableName: string, idGenerator: IdGenerator, fields: FieldMap): DbSchema {
+    static setSchema(tableName: string, idGeneratorOrFields: IdGenerator | FieldMap, fields?: FieldMap): DbSchema {
         // create and set schema
         const modelName = this.name;
         if (this.schema) throw new ModelError(`Cannot set model schema: schema for ${modelName} model has already been set`);
+
+        let idGenerator: IdGenerator;
+        if (!fields) {
+            idGenerator = guidGenerator;
+            fields = idGeneratorOrFields as FieldMap;
+        }
+        else {
+            idGenerator = idGeneratorOrFields as IdGenerator;
+        }
+
         const schema = new DbSchema(modelName, tableName, idGenerator, fields);
         this.schema = schema;
 

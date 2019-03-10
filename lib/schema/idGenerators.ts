@@ -31,6 +31,8 @@ export class GuidGenerator implements IdGenerator {
     }
 }
 
+export const guidGenerator = new GuidGenerator();
+
 // HELPERS
 // ================================================================================================
 const idExtractor = {

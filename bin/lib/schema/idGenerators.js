@@ -25,6 +25,7 @@ class GuidGenerator {
     }
 }
 exports.GuidGenerator = GuidGenerator;
+exports.guidGenerator = new GuidGenerator();
 // HELPERS
 // ================================================================================================
 const idExtractor = {

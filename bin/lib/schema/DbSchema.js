@@ -9,7 +9,6 @@ class DbSchema {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     constructor(name, table, idGenerator, fields) {
-        // TODO: default ID Generator to GuidGenerator
         // validate and set model name
         if (name === undefined)
             throw new TypeError('Cannot build model schema: model name is undefined');

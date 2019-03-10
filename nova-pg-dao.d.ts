@@ -287,8 +287,10 @@ declare module "@nova/pg-dao" {
         static SelectQuery<T extends typeof Model>(this: T, mask: 'list'): SelectAllModelsQuery<InstanceType<T>>;
         static SelectQuery<T extends typeof Model>(this: T, mask: 'single'): SelectOneModelQuery<InstanceType<T>>;
 
-        static setSchema(table: string, idGenerator: IdGenerator, fields: FieldMap): DbSchema;
         static getSchema(): DbSchema;
+
+        static setSchema(table: string, fields: FieldMap): DbSchema;
+        static setSchema(table: string, idGenerator: IdGenerator, fields: FieldMap): DbSchema;
     }
 
     export const enum SaveOriginalMethod {
