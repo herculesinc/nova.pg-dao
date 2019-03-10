@@ -1,6 +1,6 @@
 {
   "name": "@nova/pg-dao",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "PostgreSQL data access module for Nova framework",
   "keywords": [
     "nova",

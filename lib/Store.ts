@@ -2,7 +2,7 @@
 // ================================================================================================
 import { Query, FieldDescriptor, SaveOriginalMethod } from '@nova/pg-dao';
 import { Model, symMutable, symCreated, symDeleted, getModelClass, isModelClass } from './Model';
-import { ModelError, SessionError } from './errors';
+import { SessionError } from './errors';
 
 // INTERFACES
 // ================================================================================================
@@ -85,10 +85,10 @@ export class Store {
 
     insert(model: Model, created: boolean) {
         const type = getModelClass(model);
-        if (model[symDeleted]) throw new ModelError(`Cannot insert ${type.name} model: model has been deleted`);
+        if (model[symDeleted]) throw new SessionError(`Cannot insert ${type.name} model: model has been deleted`);
 
         const uid = type.name + '::' + model.id;
-        if (this.models.has(uid)) throw new ModelError(`Cannot insert ${type.name} model: model has already been inserted`);
+        if (this.models.has(uid)) throw new SessionError(`Cannot insert ${type.name} model: model has already been inserted`);
 
         if (created) {
             model[symMutable] = true;
@@ -105,13 +105,13 @@ export class Store {
 
     delete(model: Model) {
         const type = getModelClass(model);
-        if (!model[symMutable]) throw new ModelError(`Cannot delete ${type.name} model: model is not mutable`);
-        if (model[symDeleted]) throw new ModelError(`Cannot delete ${type.name} model: model has already been deleted`);
+        if (!model[symMutable]) throw new SessionError(`Cannot delete ${type.name} model: model is not mutable`);
+        if (model[symDeleted]) throw new SessionError(`Cannot delete ${type.name} model: model has already been deleted`);
 
         const uid = type.name + '::' + model.id;
         const storedModel = this.models.get(uid);
-        if (!storedModel) throw new ModelError(`Cannot delete ${type.name} model: model has not been loaded`);
-        if (storedModel !== model) throw new ModelError(`Cannot delete ${type.name} model: a different model with the same ID was found in the store`);
+        if (!storedModel) throw new SessionError(`Cannot delete ${type.name} model: model has not been loaded`);
+        if (storedModel !== model) throw new SessionError(`Cannot delete ${type.name} model: a different model with the same ID was found in the store`);
 
         if (model[symCreated]) {
             this.models.delete(uid);

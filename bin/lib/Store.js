@@ -70,10 +70,10 @@ class Store {
     insert(model, created) {
         const type = Model_1.getModelClass(model);
         if (model[Model_1.symDeleted])
-            throw new errors_1.ModelError(`Cannot insert ${type.name} model: model has been deleted`);
+            throw new errors_1.SessionError(`Cannot insert ${type.name} model: model has been deleted`);
         const uid = type.name + '::' + model.id;
         if (this.models.has(uid))
-            throw new errors_1.ModelError(`Cannot insert ${type.name} model: model has already been inserted`);
+            throw new errors_1.SessionError(`Cannot insert ${type.name} model: model has already been inserted`);
         if (created) {
             model[Model_1.symMutable] = true;
             model[Model_1.symCreated] = true;
@@ -87,15 +87,15 @@ class Store {
     delete(model) {
         const type = Model_1.getModelClass(model);
         if (!model[Model_1.symMutable])
-            throw new errors_1.ModelError(`Cannot delete ${type.name} model: model is not mutable`);
+            throw new errors_1.SessionError(`Cannot delete ${type.name} model: model is not mutable`);
         if (model[Model_1.symDeleted])
-            throw new errors_1.ModelError(`Cannot delete ${type.name} model: model has already been deleted`);
+            throw new errors_1.SessionError(`Cannot delete ${type.name} model: model has already been deleted`);
         const uid = type.name + '::' + model.id;
         const storedModel = this.models.get(uid);
         if (!storedModel)
-            throw new errors_1.ModelError(`Cannot delete ${type.name} model: model has not been loaded`);
+            throw new errors_1.SessionError(`Cannot delete ${type.name} model: model has not been loaded`);
         if (storedModel !== model)
-            throw new errors_1.ModelError(`Cannot delete ${type.name} model: a different model with the same ID was found in the store`);
+            throw new errors_1.SessionError(`Cannot delete ${type.name} model: a different model with the same ID was found in the store`);
         if (model[Model_1.symCreated]) {
             this.models.delete(uid);
             model[Model_1.symCreated] = false;

@@ -859,23 +859,31 @@ user2 === undefined; // true
 ```
 
 ## Errors
+The module provides several customized error classes which extend `Nova.Exception` class. These errors are:
 
 * **ConnectionError**, thrown when:
-  * establishing a database connection fails
-  * other?
+  * establishing a database connection fails;
 * **SessionError**, thrown when:
-  * an attempt to use an already closed session is made
-  * an attempt to make changes in a read-only session is detected
-  * an attempt to make changes to an immutable model is detected
-  * other?
+  * an attempt to use an already closed session is made;
+  * an attempt to make changes in a read-only session is detected;
+  * an attempt to fetch models for update in a read-only session is detected;
+  * an attempt to flush a read-only session is detected;
+  * an attempt to make changes to an immutable model is detected;
+  * an attempt to reload a modified model is made;
+  * an error is thrown when trying to close a session;
 * **ModelError**, thrown when:
-  * a model definition is invalid
-  * parsing of database rows into models fails
-  * other?
+  * model definition is invalid;
+  * model definition is inconsistent with the database;
+  * parsing of a database row into a model fails;
+  * serialization of a model fails;
+  * cloning of model field values fails;
+  * comparing of model field values fails;
 * **QueryError**, thrown when:
-  * execution of a query fails
+  * an attempt to build an invalid query detected;
+  * an invalid query is submitted for execution;
+  * execution of a query fails;
 * **ParseError**, thrown when:
-  * parsing of query results fails
+  * parsing of query results fails;
 
 # License
 Copyright (c) 2019 Credo360, Inc.
