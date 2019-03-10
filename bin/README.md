@@ -604,7 +604,7 @@ const users2 = await session.fetchAll(User, { id: ['1', '2', '3']}, true);
 const users2 = await session.fetchAll(User, [{ id: '1' }, { status: 1 }]);
 ```
 
-##### Filed filters
+##### Field filters
 Field filters specify conditions to be applied to a model field. They can be defined using `Operators`. For example:
 
 ```TypeScript
@@ -636,6 +636,33 @@ For `eq` and `in` operators, you can also use short-hands like so:
 ```
 
 #### Fetching via execute()
+While the operator syntax described above is quite powerful, it does not cover all possible ways in which one might want to fetch models. To create conditions of arbitrary complexity, you can create custom fetch queries for models, and then execute them like any other query using `Session.execute()` method. You can define a custom fetch query like so:
+```TypeScript
+// define a query to select all users for a given conversation
+class qGetConversationUsers extends User.SelectQuery('list') {
+    constructor(conversationId: string) {
+        // indicate that models returned by this query are immutable
+        super(false);
+
+        // set custom WHERE condition for the query
+        this.where = `id IN (SELECT user_id FROM conversations WHERE id = ${conversationId})`;
+    }
+}
+
+// fetch users associated with conversation 123
+const users = await session.execute(new qGetConversationUsers('123'));
+```
+
+In general, to create a custom fetch query, you should create a class that extends one of:
+* `Model.SelectQuery('list')` - if you want the query to return an array of models.
+* `Model.SelectQuery('single')` - if you want the query to return a single model.
+
+Within the class constructor, you should call `super()` method with a parameter indicating whether the models returned by the query are mutable or not. Then, you can:
+* Define a custom `WHERE` clause by setting `this.where` property;
+* Define a custom `FROM` clause by setting `this.from` property;
+* Define parameterization values for the query by setting `this.values` property.
+
+Note, that if you define `values` for the query, the values must be in an array, and you'll need to use `$1`, `$2` etc. notation to reference them from within your custom `WHERE` clause.
 
 ### Updating, creating, deleting models
 The module monitors models retrieved from the database and created during the session. If changes to such models are detected, they are written out to the database when the session closes, or when `Session.flush()` method is called.
@@ -644,7 +671,7 @@ The module monitors models retrieved from the database and created during the se
 Updating models is done simply by modifying model properties. No additional works is needed:
 ```TypeScript
 // retrieve user model from the database and lock it for update
-const user = await session.fetchOne(User, { id: '1'}, true);
+const user = await session.fetchOne(User, { id: '1' }, true);
 user.isMutable(); // true
 
 // update the model

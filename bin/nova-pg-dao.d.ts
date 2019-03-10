@@ -124,12 +124,12 @@ declare module "@nova/pg-dao" {
     export type QueryHandler<T=any> = typeof Object | typeof Array | typeof Model | ResultHandler<T>;
 
     export interface Query<T=any> {
-        readonly text       : string;
-        readonly name?      : string;
-        readonly mask?      : QueryMask;
-        readonly values?    : any[];
-        readonly handler?   : QueryHandler<T>;
-        readonly mutable?   : boolean;
+        text        : string;
+        name?       : string;
+        mask?       : QueryMask;
+        values?     : any[];
+        handler?    : QueryHandler<T>;
+        mutable?    : boolean;
     }
 
     export const Query: {
@@ -304,7 +304,6 @@ declare module "@nova/pg-dao" {
     }
 
     interface ModelQueryInstance {
-        readonly mutable    : boolean;
         readonly select     : string;
         from                : string;
         where?              : string;

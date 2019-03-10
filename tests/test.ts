@@ -98,6 +98,13 @@ class Token extends Model {
     origin!: any;
 }
 
+class qSelectConversationTokens extends Token.SelectQuery('list') {
+    constructor(conversationId: string) {
+        super(false);
+        this.where = `id IN (SELECT token_id FROM conversations WHERE id = ${conversationId})`;
+    }
+}
+
 (function modelTests() {
 
     console.log(JSON.stringify(Token.getSchema()));
@@ -114,6 +121,7 @@ class Token extends Model {
         }
     ]).text);
     console.log(new qSelectTokens(false, { id: Op.in(['1', '2']) }).text);
+    console.log(new qSelectConversationTokens('1').text);
 });
 
 // DATABASE TESTS
